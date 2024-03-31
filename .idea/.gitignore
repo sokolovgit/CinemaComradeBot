@@ -8,3 +8,9 @@
 /dataSources.local.xml
 # GitHub Copilot persisted chat sessions
 /copilot/chatSessions
+#Configuration files for project settings
+config.py
+#Mac OS files
+.DS_Store
+#DATABASE
+db.sqlite3
