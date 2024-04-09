@@ -23,8 +23,6 @@ logger = setup_logger()
 async def start_language(message: Message, i18n: I18nContext,
                          dialog_manager: DialogManager, session: AsyncSession):
     tg_id = message.from_user.id
-    dialog_manager.dialog_data["tg_id"] = message.from_user.id
-
     data = {
         "tg_id": tg_id
     }

@@ -12,7 +12,7 @@ from aiogram_i18n import I18nContext
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.requests import db_get_all_movies, db_get_users_movies
+from database.requests import db_get_users_movies
 
 from utils.logger import setup_logger
 from utils.i18n_format import I18NFormat
@@ -26,7 +26,9 @@ logger = setup_logger()
 
 
 async def get_list_movies(event_isolation, dialog_manager: DialogManager, session: AsyncSession, *args, **kwargs):
-    tg_id = dialog_manager.start_data["tg_id"]
+    dialog_manager.dialog_data["tg_id"] = dialog_manager.start_data["tg_id"]
+
+    tg_id = dialog_manager.dialog_data.get("tg_id")
     db_movies = await db_get_users_movies(session, tg_id)
     movie_list = [movie.to_dict() for movie in db_movies]
     dialog_manager.dialog_data["movies"] = movie_list
@@ -143,7 +145,10 @@ async def on_language_selected(callback: CallbackQuery, widget: Any,
 
     await i18n.set_locale(language)
     logger.info("User id=%s chose language=%s", callback.from_user.id, language)
-    await dialog_manager.start(MainMenu.show_list, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT)
+    await dialog_manager.start(MainMenu.show_list,
+                               mode=StartMode.RESET_STACK,
+                               show_mode=ShowMode.EDIT,
+                               data={"tg_id": callback.from_user.id})
 
 
 async def change_language(message: Message, dialog_manager: DialogManager):
