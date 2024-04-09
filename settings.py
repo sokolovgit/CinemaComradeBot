@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     DEFAULT_LOCALE: str
 
+    TMDB_API_KEY: SecretStr
+
     REDIS_HOST: str
     REDIS_PORT: int
 

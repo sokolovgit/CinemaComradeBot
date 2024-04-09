@@ -1,16 +1,13 @@
-import logging
-import sys
+from typing import List
+
+from utils.logger import setup_logger
 
 from sqlalchemy import select
-from database.models import User, Movie
+from database.models import User, Movie, user_movie_association
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-                    stream=sys.stdout)
-
-logger = logging.getLogger(__name__)
+logger = setup_logger()
 
 
 async def db_add_user(session: AsyncSession, data: dict):
@@ -23,7 +20,6 @@ async def db_add_user(session: AsyncSession, data: dict):
 
     new_user = User(
         tg_id=data["tg_id"],
-        preferred_language=data["language"]
     )
 
     session.add(new_user)
@@ -31,6 +27,17 @@ async def db_add_user(session: AsyncSession, data: dict):
     logger.info("New user added to database id=%s", new_user.tg_id)
 
 
-async def db_get_movies(session: AsyncSession):
+async def db_get_all_movies(session: AsyncSession):
     movies = await session.execute(select(Movie))
+    return movies.scalars().all()
+
+
+async def db_get_users_movies(session: AsyncSession, tg_id: int):
+    # Querying movies associated with the user_id
+    stmt = select(Movie).join(user_movie_association).filter(user_movie_association.c.user_id == tg_id)
+
+    # Executing the query
+    movies = await session.execute(stmt)
+
+    # Returning the list of movies
     return movies.scalars().all()

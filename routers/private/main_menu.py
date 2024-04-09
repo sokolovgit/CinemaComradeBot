@@ -1,36 +1,36 @@
 import typing
-
-from aiogram.types import CallbackQuery, Message
+from typing import Any
 
 from settings import settings
 
-from typing import Dict, Any
-
 from aiogram import F
-
-from aiogram_dialog import DialogManager, Dialog, Window, StartMode
-from aiogram_dialog.widgets.common import Whenable
+from aiogram.types import CallbackQuery, Message
+from aiogram_dialog import DialogManager, Dialog, Window, StartMode, ShowMode
 from aiogram_dialog.widgets.text import Format, Multi, List, Const
-from aiogram_dialog.widgets.kbd import Row, Button, ScrollingGroup
-
+from aiogram_dialog.widgets.kbd import Row, Button, Select
 from aiogram_i18n import I18nContext
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.requests import db_get_movies
+from database.requests import db_get_all_movies, db_get_users_movies
 
 from utils.logger import setup_logger
 from utils.i18n_format import I18NFormat
 
 from states.main_menu import MainMenu
-from states.change_language import ChangeLanguage
+
+from enums.language import Language
 
 
 logger = setup_logger()
 
 
 async def get_list_movies(event_isolation, dialog_manager: DialogManager, session: AsyncSession, *args, **kwargs):
-    db_movies = await db_get_movies(session)
+    tg_id = dialog_manager.middleware_data[]
+    print(tg_id)
+    db_movies = await db_get_users_movies(session, tg_id)
+    #db_movies = await db_get_all_movies(session)
+
     movie_list = [movie.to_dict() for movie in db_movies]
     dialog_manager.dialog_data["movies"] = movie_list
 
@@ -129,8 +129,29 @@ async def on_arrow_right(callback: CallbackQuery, button: Button,
         dialog_manager.dialog_data["current_pos"] += page_size
 
 
-async def change_language(message: Message, i18n: I18nContext, dialog_manager: DialogManager):
-    await dialog_manager.start(ChangeLanguage.change_language, mode=StartMode.RESET_STACK)
+async def get_language_list(event_isolation, dialog_manager: DialogManager, i18n: I18nContext, *args, **kwargs):
+    languages = []
+    for language in Language.__members__.values():
+        languages.append((i18n.get(language), language))
+
+    return {
+        "languages": languages
+    }
+
+
+async def on_language_selected(callback: CallbackQuery, widget: Any,
+                               dialog_manager: DialogManager, item_id: str):
+    language = item_id
+    i18n: I18nContext = dialog_manager.middleware_data.get("i18n")
+
+    await i18n.set_locale(language)
+    logger.info("User id=%s chose language=%s", callback.from_user.id, language)
+    await dialog_manager.start(MainMenu.show_list, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT)
+
+
+async def change_language(message: Message, dialog_manager: DialogManager):
+    await dialog_manager.start(MainMenu.change_language, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT)
+    await message.delete()
 
 
 main_menu = Dialog(
@@ -181,6 +202,18 @@ main_menu = Dialog(
         ),
         state=MainMenu.show_list,
         getter=get_list_movies
+    ),
+    Window(
+        I18NFormat("choose-language"),
+        Select(
+            Format("{item[0]}"),
+            id="select_language",
+            item_id_getter=lambda item: item[1],
+            items="languages",
+            on_click=on_language_selected
+        ),
+        state=MainMenu.change_language,
+        getter=get_language_list
     )
 )
 
