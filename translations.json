@@ -1,0 +1,13 @@
+{
+  "en": {
+    "hello_world": "Hello World",
+    "change_language": "Choose language:",
+    "changed_language": "Language changed to English"
+  },
+
+  "uk": {
+    "hello_world": "Привіт Світ",
+    "change_language": "Оберіть мову:",
+    "changed_language": "Мова змінена на Українську"
+  }
+}
