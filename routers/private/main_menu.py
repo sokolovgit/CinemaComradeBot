@@ -26,11 +26,8 @@ logger = setup_logger()
 
 
 async def get_list_movies(event_isolation, dialog_manager: DialogManager, session: AsyncSession, *args, **kwargs):
-    tg_id = dialog_manager.middleware_data[]
-    print(tg_id)
+    tg_id = dialog_manager.start_data["tg_id"]
     db_movies = await db_get_users_movies(session, tg_id)
-    #db_movies = await db_get_all_movies(session)
-
     movie_list = [movie.to_dict() for movie in db_movies]
     dialog_manager.dialog_data["movies"] = movie_list
 

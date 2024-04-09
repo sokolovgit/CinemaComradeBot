@@ -33,11 +33,18 @@ async def db_get_all_movies(session: AsyncSession):
 
 
 async def db_get_users_movies(session: AsyncSession, tg_id: int):
-    # Querying movies associated with the user_id
-    stmt = select(Movie).join(user_movie_association).filter(user_movie_association.c.user_id == tg_id)
+    user = await session.execute(select(User).where(User.tg_id == tg_id))
+    user_in_db = user.scalars().first()
 
-    # Executing the query
-    movies = await session.execute(stmt)
+    if not user_in_db:
+        return []
 
-    # Returning the list of movies
-    return movies.scalars().all()
+    user_id = user_in_db.id
+
+    stmt = select(Movie).join(user_movie_association).filter(user_movie_association.c.user_id == user_id)
+    result = await session.execute(stmt)
+
+    return result.scalars().all()
+
+
+

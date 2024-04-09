@@ -59,6 +59,10 @@ async def get_user_info(event_isolation, dialog_manager: DialogManager, *args, *
     }
 
 
+async def on_start_workflow(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    await dialog_manager.start(MainMenu.show_list, data={"tg_id": callback.from_user.id})
+
+
 start = Dialog(
     Window(
         I18NFormat("choose-language"),
@@ -75,13 +79,12 @@ start = Dialog(
         state=ChangeLanguage.change_language),
     Window(
         I18NFormat("chosen-language"),
-        Start(
+        Button(
             I18NFormat("get-started"),
-            state=MainMenu.show_list,
             id="start_workflow",
+            on_click=on_start_workflow
         ),
         state=ChangeLanguage.language_changed,
-        getter=get_user_info
         ),
 )
 
