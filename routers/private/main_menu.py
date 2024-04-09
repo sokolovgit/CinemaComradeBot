@@ -1,6 +1,8 @@
 import typing
 from typing import Any
 
+import tmdbsimple as tmdb
+
 from settings import settings
 
 from aiogram import F
@@ -23,15 +25,20 @@ from enums.language import Language
 
 
 logger = setup_logger()
+tmdb.API_KEY = settings.TMDB_API_KEY.get_secret_value()
 
 
-async def get_list_movies(event_isolation, dialog_manager: DialogManager, session: AsyncSession, *args, **kwargs):
+async def get_list_movies(event_isolation, dialog_manager: DialogManager,
+                          session: AsyncSession, i18n: I18nContext,
+                          *args, **kwargs):
     dialog_manager.dialog_data["tg_id"] = dialog_manager.start_data["tg_id"]
 
     tg_id = dialog_manager.dialog_data.get("tg_id")
     db_movies = await db_get_users_movies(session, tg_id)
-    movie_list = [movie.to_dict() for movie in db_movies]
-    dialog_manager.dialog_data["movies"] = movie_list
+    movie_ids = [movie.tmdb_id for movie in db_movies]
+    movies_num = len(movie_ids)
+
+    dialog_manager.dialog_data["movies_num"] = movies_num
 
     if "page_size" not in dialog_manager.dialog_data:
         dialog_manager.dialog_data["page_size"] = settings.PAGE_SIZE
@@ -39,10 +46,10 @@ async def get_list_movies(event_isolation, dialog_manager: DialogManager, sessio
     if "current_pos" not in dialog_manager.dialog_data:
         dialog_manager.dialog_data["current_pos"] = 0
 
-    movies_num = len(movie_list)
     is_empty = movies_num == 0
 
-    message = "no movies" if is_empty else make_list(movie_list, dialog_manager)
+    movies_info = await fetch_movie_details(movie_ids, i18n.locale)
+    message = "no movies" if is_empty else make_list(movies_info, dialog_manager, i18n)
 
     return {
         "is_empty": is_empty,
@@ -52,23 +59,32 @@ async def get_list_movies(event_isolation, dialog_manager: DialogManager, sessio
     }
 
 
-def make_list(movies: typing.List, dialog_manager: DialogManager):
+async def fetch_movie_details(movie_ids, language):
+    movies_info = []
+    for movie_id in movie_ids:
+        movie_info = tmdb.Movies(id=movie_id).info(language=language)
+        movies_info.append(movie_info)
+    return movies_info
+
+
+def make_list(movies_info: typing.List[dict], dialog_manager: DialogManager, i18n: I18nContext):
     page_size = dialog_manager.dialog_data["page_size"]
     current_pos = dialog_manager.dialog_data["current_pos"]
     current_page = current_pos // page_size + 1
     dialog_manager.dialog_data["current_page"] = current_page
 
-    movies_num = len(movies)
+    movies_num = len(movies_info)
 
     start = (current_page - 1) * page_size
     end = start + page_size
 
     movie_list = []
     for i in range(start, min(end, movies_num)):
-        movie = movies[i]
-        movie_str = f"{movie['id']}, {movie['tmdb_id']}"
+        movie = movies_info[i]
+
+        movie_str = f"{movie['id']}, {movie['title']} {movie['release_date']}"
         if i == current_pos:
-            movie_str = f"<b>{movie_str}</b>"
+            movie_str = f"<b>{movie_str} ⬅️ </b>"
         movie_list.append(movie_str)
 
     return "\n".join(movie_list)
@@ -77,7 +93,7 @@ def make_list(movies: typing.List, dialog_manager: DialogManager):
 async def on_arrow_up(callback: CallbackQuery, button: Button,
                       dialog_manager: DialogManager):
     current_pos = dialog_manager.dialog_data["current_pos"]
-    movies_num = len(dialog_manager.dialog_data["movies"])
+    movies_num = dialog_manager.dialog_data["movies_num"]
 
     if current_pos == 0:
         # If it's the first position, go to the last position
@@ -89,7 +105,7 @@ async def on_arrow_up(callback: CallbackQuery, button: Button,
 async def on_arrow_down(callback: CallbackQuery, button: Button,
                         dialog_manager: DialogManager):
     current_pos = dialog_manager.dialog_data["current_pos"]
-    movies_num = len(dialog_manager.dialog_data["movies"])
+    movies_num = dialog_manager.dialog_data["movies_num"]
 
     if current_pos == movies_num - 1:
         # If it's the last position, go to the first position
@@ -102,7 +118,7 @@ async def on_arrow_left(callback: CallbackQuery, button: Button,
                         dialog_manager: DialogManager):
     current_pos = dialog_manager.dialog_data["current_pos"]
     page_size = dialog_manager.dialog_data["page_size"]
-    movies_num = len(dialog_manager.dialog_data["movies"])
+    movies_num = dialog_manager.dialog_data["movies_num"]
     pages_num = movies_num // page_size + 1
 
     if current_pos - page_size < 0:
@@ -115,7 +131,7 @@ async def on_arrow_right(callback: CallbackQuery, button: Button,
                          dialog_manager: DialogManager):
     current_pos = dialog_manager.dialog_data["current_pos"]
     page_size = dialog_manager.dialog_data["page_size"]
-    movies_num = len(dialog_manager.dialog_data["movies"])
+    movies_num = dialog_manager.dialog_data["movies_num"]
     pages_num = movies_num // page_size + (1 if movies_num % page_size else 0)
     current_page = current_pos // page_size + 1
 
