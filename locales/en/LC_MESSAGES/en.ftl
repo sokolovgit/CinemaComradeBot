@@ -29,7 +29,7 @@ sorting =
     Sorting in { $order ->
         [ascending] ascending
         [descending] descending
-        [when_added] date added
+        [date_added] date added
         *[other] Unknown
     }
 

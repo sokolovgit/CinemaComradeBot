@@ -30,6 +30,6 @@ sorting =
     Сортування за { $order ->
         [ascending] зростанням
         [descending] спаданням
-        [when_added] датою додавання
+        [date_added] датою додавання
         *[other] Невідомо
     }

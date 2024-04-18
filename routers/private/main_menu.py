@@ -79,13 +79,15 @@ def make_list(movies_info: typing.List[dict], dialog_manager: DialogManager, i18
     end = start + page_size
 
     movie_list = []
+    index = 1
     for i in range(start, min(end, movies_num)):
         movie = movies_info[i]
 
-        movie_str = f"{movie['id']}, {movie['title']} {movie['release_date']}"
+        movie_str = f"{index}. {movie['title']} {movie['vote_average']}"
         if i == current_pos:
             movie_str = f"<b>{movie_str} ⬅️ </b>"
         movie_list.append(movie_str)
+        index += 1
 
     return "\n".join(movie_list)
 
@@ -215,7 +217,7 @@ main_menu = Dialog(
             ),
         Button(
             I18NFormat("sorting", order="pass"),
-            id="sorting",
+            id="sorting.py",
             when=~F["is_empty"]
         ),
         state=MainMenu.show_list,
