@@ -12,7 +12,7 @@ user_movie_association = Table(
     'user_movie_association', Base.metadata,
     Column('user_id', ForeignKey('users.id'), primary_key=True),
     Column('movie_id', ForeignKey('movies.id'), primary_key=True),
-    Column('liked_at', DateTime, default=func.now())
+    Column('added_at', DateTime, default=func.now())
 )
 
 

@@ -148,11 +148,62 @@ async def change_language(message: Message, dialog_manager: DialogManager):
     await message.delete()
 
 
+async def add_movie(message: Message, dialog_manager: DialogManager, i18n: I18nContext):
+    await dialog_manager.start(MainMenu.add_movie, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT,
+                               data={"tg_id": message.from_user.id,
+                                     "message": message.text})
+    await message.delete()
+
+
+async def get_add_movies_list(event_isolation, dialog_manager: DialogManager, i18n: I18nContext, *args, **kwargs):
+    dialog_manager.dialog_data["tg_id"] = dialog_manager.start_data["tg_id"]
+    message = dialog_manager.start_data["message"]
+
+    dialog_manager.dialog_data.setdefault("page_size", settings.PAGE_SIZE)
+    dialog_manager.dialog_data.setdefault("current_page", 1)
+
+    search = tmdb.Search()
+    response = search.movie(query=message, language=i18n.locale)
+
+    movies = []
+
+    for movie in response['results']:
+        movie_str = f"{movie['title']} {movie['vote_average']}"
+        movies.append((movie_str, movie['id']))
+
+    movies_num = len(movies)
+    dialog_manager.dialog_data["pages_num"] = movies_num // settings.PAGE_SIZE
+
+    page_size = dialog_manager.dialog_data["page_size"]
+    current_page = dialog_manager.dialog_data["current_page"]
+
+    start = (current_page - 1) * page_size
+    end = start + page_size
+
+    movies = movies[start:end]
+
+    return {
+        "movies": movies,
+        "current_page": dialog_manager.dialog_data.get("current_page"),
+        "pages_num": dialog_manager.dialog_data.get("pages_num")
+    }
+
+
+async def on_back(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    await dialog_manager.start(MainMenu.show_list,
+                               mode=StartMode.RESET_STACK,
+                               show_mode=ShowMode.EDIT,
+                               data={"tg_id": callback.from_user.id})
+
+
 main_menu = Dialog(
+    # Show list of movies window
     Window(
         Multi(
-            I18NFormat("show-movies", when=~F["is_empty"]),
-            I18NFormat("no-movies", when=F["is_empty"])),
+            I18NFormat("show-movies",
+                       when=~F["is_empty"]),
+            I18NFormat("no-movies",
+                       when=F["is_empty"])),
         Column(
             Select(
                 Format("{item[0]}"),
@@ -169,7 +220,8 @@ main_menu = Dialog(
                 on_click=on_arrow_left
             ),
             Button(
-                Format("{current_page} / {pages_num}", when=~F["is_empty"]),
+                Format("{current_page} / {pages_num}",
+                       when=~F["is_empty"]),
                 id="page"
             ),
             Button(
@@ -186,13 +238,14 @@ main_menu = Dialog(
             ),
             Button(
                 I18NFormat("sorting", order="pass"),
-                id="sorting.py",
+                id="sorting",
                 when=~F["is_empty"]
             )
         ),
         state=MainMenu.show_list,
         getter=get_movies_list
     ),
+    # Change language window
     Window(
         I18NFormat("choose-language"),
         Select(
@@ -204,5 +257,40 @@ main_menu = Dialog(
         ),
         state=MainMenu.change_language,
         getter=get_language_list
+    ),
+    # Add movie window
+    Window(
+        I18NFormat("choose-movie-to-add"),
+        Column(
+            Select(
+                Format("{item[0]}"),
+                id="s_movies_to_add",
+                item_id_getter=lambda item: item[1],
+                items="movies",
+            ),
+        ),
+        Row(
+            Button(
+                I18NFormat("arrow-left"),
+                id="arrow_left",
+                on_click=on_arrow_left
+            ),
+            Button(
+                Format("{current_page} / {pages_num}"),
+                id="page"
+            ),
+            Button(
+                I18NFormat("arrow-right"),
+                id="arrow_right",
+                on_click=on_arrow_right
+            )
+        ),
+        Button(
+            I18NFormat("go-back"),
+            id="go_back",
+            on_click=on_back
+        ),
+        state=MainMenu.add_movie,
+        getter=get_add_movies_list
     )
 )

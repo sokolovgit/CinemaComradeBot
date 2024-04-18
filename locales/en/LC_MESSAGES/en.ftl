@@ -32,5 +32,9 @@ sorting =
         [date_added] date added
         *[other] Unknown
     }
+choose-movie-to-add =
+    Choose you want to add to the list:
+go-back =
+    ⬅️ Go back!
 
 

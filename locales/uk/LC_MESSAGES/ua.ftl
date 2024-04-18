@@ -33,3 +33,7 @@ sorting =
         [date_added] датою додавання
         *[other] Невідомо
     }
+choose-movie-to-add =
+    Оберіть фільм який ви хочете додати:
+go-back =
+    ⬅️ Назад!
