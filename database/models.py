@@ -1,16 +1,18 @@
 from typing import List
 
-from sqlalchemy import BigInteger, String, Table, ForeignKey, Column
+from sqlalchemy import BigInteger, String, Table, ForeignKey, Column, DateTime, func
 from sqlalchemy.orm import relationship, Mapped, DeclarativeBase, mapped_column
 
 
 class Base(DeclarativeBase):
     pass
 
+
 user_movie_association = Table(
     'user_movie_association', Base.metadata,
     Column('user_id', ForeignKey('users.id'), primary_key=True),
-    Column('movie_id', ForeignKey('movies.id'), primary_key=True)
+    Column('movie_id', ForeignKey('movies.id'), primary_key=True),
+    Column('liked_at', DateTime, default=func.now())
 )
 
 

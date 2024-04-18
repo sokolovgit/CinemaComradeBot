@@ -41,7 +41,9 @@ async def db_get_users_movies(session: AsyncSession, tg_id: int):
 
     user_id = user_in_db.id
 
-    stmt = select(Movie).join(user_movie_association).filter(user_movie_association.c.user_id == user_id)
+    stmt = (select(Movie, user_movie_association.c.liked_at).
+            join(user_movie_association).
+            filter(user_movie_association.c.user_id == user_id))
     result = await session.execute(stmt)
 
     return result.scalars().all()

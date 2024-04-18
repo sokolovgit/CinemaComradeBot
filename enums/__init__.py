@@ -1,6 +1,6 @@
 from .language import Language
-from .sorting import Sorting
+from .sorting import SortingType
 __all__ = [
     "Language",
-    "Sorting",
+    "SortingType",
     ]
