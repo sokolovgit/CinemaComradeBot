@@ -10,49 +10,52 @@ class Base(DeclarativeBase):
 
 user_movie_association = Table(
     'user_movie_association', Base.metadata,
-    Column('user_id', ForeignKey('users.id'), primary_key=True),
-    Column('movie_id', ForeignKey('movies.id'), primary_key=True),
-    Column('added_at', DateTime, default=func.now())
+    Column('user_tg_id', ForeignKey('users.tg_id'), primary_key=True),
+    Column('movie_tmdb_id', ForeignKey('movies.tmdb_id'), primary_key=True),
+    Column('added_at', DateTime, server_default=func.now())  # Add a column for the timestamp
 )
-
 
 movie_genre_association = Table(
     'movie_genre_association', Base.metadata,
-    Column('movie_id', ForeignKey('movies.id'), primary_key=True),
-    Column('genre_id', ForeignKey('genres.id'), primary_key=True)
+    Column('movie_tmdb_id', ForeignKey('movies.tmdb_id'), primary_key=True),
+    Column('genre_tmdb_id', ForeignKey('genres.tmdb_id'), primary_key=True)
 )
 
 
 class User(Base):
     __tablename__ = 'users'
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    tg_id: Mapped[int] = mapped_column(BigInteger)
-    liked_movies: Mapped[List["Movie"]] = relationship(secondary=user_movie_association)
+    tg_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    liked_movies: Mapped[List["Movie"]] = relationship(
+        secondary=user_movie_association,
+        back_populates="users"
+    )
 
 
 class Movie(Base):
     __tablename__ = 'movies'
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    tmdb_id: Mapped[int] = mapped_column()
+    tmdb_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     genres: Mapped[List["Genres"]] = relationship(secondary=movie_genre_association)
+    users: Mapped[List["User"]] = relationship(
+        secondary=user_movie_association,
+        back_populates="liked_movies"
+    )
 
     def __repr__(self):
-        return f"<Movie(id={self.id}, tmdb_id={self.tmdb_id})>"
+        return f"<Movie(tmdb_id={self.tmdb_id})>"
 
     def to_dict(self):
         return {
-            "id": self.id,
             "tmdb_id": self.tmdb_id,
             # Add other attributes here if needed
         }
 
+
 class Genres(Base):
     __tablename__ = 'genres'
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    tmdb_id: Mapped[int] = mapped_column()
+    tmdb_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
 
 
 

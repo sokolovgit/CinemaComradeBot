@@ -15,7 +15,7 @@ from aiogram_i18n import I18nContext
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.requests import db_get_users_movies, db_get_all_movies
+from database.requests import db_get_users_movies, db_get_all_movies, db_add_movie_to_user
 
 from utils.logger import setup_logger
 from utils.i18n_format import I18NFormat
@@ -39,14 +39,16 @@ async def get_movies_list(event_isolation, dialog_manager: DialogManager,
 
     tg_id = dialog_manager.dialog_data.get("tg_id")
 
-    #db_movies = await db_get_users_movies(session, tg_id)
-    db_movies = await db_get_all_movies(session)
+    db_movies = await db_get_users_movies(session, tg_id)
 
     movies_num = len(db_movies)
 
-    dialog_manager.dialog_data["pages_num"] = movies_num // settings.PAGE_SIZE + 1
+    dialog_manager.dialog_data["pages_num"] = movies_num // settings.PAGE_SIZE if movies_num % settings.PAGE_SIZE == 0 \
+        else movies_num // settings.PAGE_SIZE + 1
 
     is_empty = movies_num == 0
+    is_movie_rate = dialog_manager.dialog_data.get("sorting_type") == SortingType.MOVIE_RATE
+    is_descending = dialog_manager.dialog_data.get("sorting_order") == SortingOrder.DESCENDING
 
     movies_info = await fetch_movie_details(db_movies, i18n.locale, dialog_manager)
     movies_on_page = await make_list(movies_info, dialog_manager, i18n)
@@ -55,13 +57,16 @@ async def get_movies_list(event_isolation, dialog_manager: DialogManager,
         "is_empty": is_empty,
         "movies_on_page": movies_on_page,
         "current_page": dialog_manager.dialog_data.get("current_page", 1),
-        "pages_num": dialog_manager.dialog_data.get("pages_num", 1)
+        "pages_num": dialog_manager.dialog_data.get("pages_num", 1),
+        "sorting_type": is_movie_rate,
+        "sorting_order": is_descending
     }
 
 
 async def sort_movies(movies, dialog_manager: DialogManager):
     sorting_type = dialog_manager.dialog_data.get("sorting_type")
     sorting_order = dialog_manager.dialog_data.get("sorting_order")
+    sort_key = lambda movie: movie['vote_average']
     reverse = False
 
     if sorting_type == SortingType.MOVIE_RATE:
@@ -120,6 +125,20 @@ async def on_arrow_right(callback: CallbackQuery, button: Button, dialog_manager
     data["current_page"] = 1 if current_page == pages_num else current_page + 1
 
 
+async def on_sorting_type(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    sorting_type = dialog_manager.dialog_data.get("sorting_type")
+
+    dialog_manager.dialog_data["sorting_type"] = SortingType.LIKED_TIME if sorting_type == SortingType.MOVIE_RATE \
+        else SortingType.MOVIE_RATE
+
+
+async def on_sorting_order(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    sorting_order = dialog_manager.dialog_data.get("sorting_order")
+
+    dialog_manager.dialog_data["sorting_order"] = SortingOrder.ASCENDING if sorting_order == SortingOrder.DESCENDING \
+        else SortingOrder.DESCENDING
+
+
 async def get_language_list(event_isolation, dialog_manager: DialogManager, i18n: I18nContext, *args, **kwargs):
     languages = []
     for language in Language.__members__.values():
@@ -155,7 +174,9 @@ async def add_movie(message: Message, dialog_manager: DialogManager, i18n: I18nC
     await message.delete()
 
 
-async def get_add_movies_list(event_isolation, dialog_manager: DialogManager, i18n: I18nContext, *args, **kwargs):
+async def get_add_movies_list(event_isolation, dialog_manager: DialogManager, i18n: I18nContext,
+                              session: AsyncSession, *args, **kwargs):
+    dialog_manager.middleware_data["session"] = session
     dialog_manager.dialog_data["tg_id"] = dialog_manager.start_data["tg_id"]
     message = dialog_manager.start_data["message"]
 
@@ -185,11 +206,25 @@ async def get_add_movies_list(event_isolation, dialog_manager: DialogManager, i1
     return {
         "movies": movies,
         "current_page": dialog_manager.dialog_data.get("current_page"),
-        "pages_num": dialog_manager.dialog_data.get("pages_num")
+        "pages_num": dialog_manager.dialog_data.get("pages_num"),
+        "is_empty": movies_num == 0
     }
 
 
 async def on_back(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    await dialog_manager.start(MainMenu.show_list,
+                               mode=StartMode.RESET_STACK,
+                               show_mode=ShowMode.EDIT,
+                               data={"tg_id": callback.from_user.id})
+
+
+async def on_movie_to_add(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
+    tg_id: int = dialog_manager.dialog_data.get("tg_id")
+    session: AsyncSession = dialog_manager.middleware_data.get("session")
+    tmdb_id = int(item_id)
+
+    await db_add_movie_to_user(session, tg_id, tmdb_id)
+
     await dialog_manager.start(MainMenu.show_list,
                                mode=StartMode.RESET_STACK,
                                show_mode=ShowMode.EDIT,
@@ -233,12 +268,21 @@ main_menu = Dialog(
         ),
         Row(
             Button(
-                I18NFormat("get-description"),
-                id="get_description",
+                Multi(
+                    I18NFormat("sorting-rate", when=F["sorting_type"]),
+                    I18NFormat("sorting-date", when=~F["sorting_type"]),
+                ),
+                id="sorting_type",
+                on_click=on_sorting_type,
+                when=~F["is_empty"]
             ),
             Button(
-                I18NFormat("sorting", order="pass"),
-                id="sorting",
+                Multi(
+                    I18NFormat("order-asc", when=~F["sorting_order"]),
+                    I18NFormat("order-desc", when=F["sorting_order"]),
+                ),
+                id="sorting_order",
+                on_click=on_sorting_order,
                 when=~F["is_empty"]
             )
         ),
@@ -260,14 +304,17 @@ main_menu = Dialog(
     ),
     # Add movie window
     Window(
-        I18NFormat("choose-movie-to-add"),
+        I18NFormat("choose-movie-to-add", when=~F["is_empty"]),
+        I18NFormat("no-movies-found", when=F["is_empty"]),
         Column(
             Select(
                 Format("{item[0]}"),
                 id="s_movies_to_add",
                 item_id_getter=lambda item: item[1],
                 items="movies",
+                on_click=on_movie_to_add,
             ),
+            when=~F["is_empty"]
         ),
         Row(
             Button(
@@ -283,7 +330,8 @@ main_menu = Dialog(
                 I18NFormat("arrow-right"),
                 id="arrow_right",
                 on_click=on_arrow_right
-            )
+            ),
+            when=~F["is_empty"]
         ),
         Button(
             I18NFormat("go-back"),

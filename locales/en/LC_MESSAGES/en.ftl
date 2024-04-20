@@ -25,16 +25,18 @@ arrow-left =
     ←
 arrow-right =
     →
-sorting =
-    Sorting in { $order ->
-        [ascending] ascending
-        [descending] descending
-        [date_added] date added
-        *[other] Unknown
-    }
+sorting-rate =
+    Sort by: rating
+sorting-date =
+    Sort by: date added
+order-asc =
+    Order: ascending
+order-desc =
+    Order: descending
 choose-movie-to-add =
-    Choose you want to add to the list:
+    Choose the movie you want to add to the list:
 go-back =
     ⬅️ Go back!
-
+no-movies-found =
+    Oops! No movies were found 😓
 
