@@ -1,21 +1,24 @@
 import operator
 import typing
 from typing import Any
+from datetime import datetime
 
 import tmdbsimple as tmdb
+from aiogram_dialog.api.entities import MediaAttachment, MediaId
 
 from settings import settings
 
 from aiogram import F
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ContentType
 from aiogram_dialog import DialogManager, Dialog, Window, StartMode, ShowMode
 from aiogram_dialog.widgets.text import Format, Multi, List, Const
 from aiogram_dialog.widgets.kbd import Row, Button, Select, Column
+from aiogram_dialog.widgets.media import StaticMedia, DynamicMedia
 from aiogram_i18n import I18nContext
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.requests import db_get_users_movies, db_get_all_movies, db_add_movie_to_user
+from database.requests import db_get_users_movies, db_get_all_movies, db_add_movie_to_user, db_get_movie_added_time
 
 from utils.logger import setup_logger
 from utils.i18n_format import I18NFormat
@@ -50,7 +53,7 @@ async def get_movies_list(event_isolation, dialog_manager: DialogManager,
     is_movie_rate = dialog_manager.dialog_data.get("sorting_type") == SortingType.MOVIE_RATE
     is_descending = dialog_manager.dialog_data.get("sorting_order") == SortingOrder.DESCENDING
 
-    movies_info = await fetch_movie_details(db_movies, i18n.locale, dialog_manager)
+    movies_info = await fetch_movie_details(db_movies, i18n.locale, dialog_manager, session)
     movies_on_page = await make_list(movies_info, dialog_manager, i18n)
 
     return {
@@ -71,17 +74,22 @@ async def sort_movies(movies, dialog_manager: DialogManager):
 
     if sorting_type == SortingType.MOVIE_RATE:
         sort_key = lambda movie: movie['vote_average']
+    elif sorting_type == SortingType.LIKED_TIME:  # Assuming this is the constant for sorting by date
+        sort_key = lambda movie: movie['added_at']
+
     if sorting_order == SortingOrder.DESCENDING:
         reverse = True
 
     movies.sort(key=sort_key, reverse=reverse)
 
 
-async def fetch_movie_details(db_movies, language, dialog_manager: DialogManager):
+async def fetch_movie_details(db_movies, language, dialog_manager: DialogManager, session: AsyncSession):
     movies_info = []
     for movie in db_movies:
         movie_id = movie.tmdb_id
         movie_info = tmdb.Movies(id=movie_id).info(language=language)
+        added_at = await db_get_movie_added_time(session, dialog_manager.dialog_data.get("tg_id"), movie_id)
+        movie_info['added_at'] = added_at
         movies_info.append(movie_info)
 
     await sort_movies(movies_info, dialog_manager)
@@ -223,12 +231,84 @@ async def on_movie_to_add(callback: CallbackQuery, widget: Any, dialog_manager: 
     session: AsyncSession = dialog_manager.middleware_data.get("session")
     tmdb_id = int(item_id)
 
-    await db_add_movie_to_user(session, tg_id, tmdb_id)
+    # Fetch movie details
+    movie = tmdb.Movies(id=tmdb_id)
+    movie_info = movie.info()
+
+    # Create a dictionary with the movie data
+    movie_data = {
+        'tmdb_id': movie_info['id'],
+        'movie_name': movie_info['title'],
+        # Add other attributes here if needed
+    }
+
+    await db_add_movie_to_user(session, tg_id, movie_data)
 
     await dialog_manager.start(MainMenu.show_list,
                                mode=StartMode.RESET_STACK,
                                show_mode=ShowMode.EDIT,
                                data={"tg_id": callback.from_user.id})
+
+
+async def on_movie_details(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
+    await dialog_manager.start(
+        MainMenu.show_details,
+        mode=StartMode.RESET_STACK,
+        show_mode=ShowMode.EDIT,
+        data={"movie_id": item_id}
+    )
+
+
+async def get_movie_details(event_isolation, dialog_manager: DialogManager, session: AsyncSession, i18n: I18nContext,
+                            *args, **kwargs):
+    movie_id = dialog_manager.start_data["movie_id"]
+    movie = tmdb.Movies(id=movie_id).info(language=i18n.locale)
+
+    countries = [country['iso_3166_1'] for country in movie['production_countries']]
+
+    print(countries)
+
+    movie_title = f"🎬 {i18n.get('movie-title')} <b>{movie['title']}</b>"
+    original_movie_title = f"<b>({movie['original_title']})</b>" \
+        if movie['original_language'] != i18n.locale else ''
+
+    release_date = (f"📅 {i18n.get('release-date')} "
+                    f"<b>{datetime.strptime(movie['release_date'], '%Y-%m-%d').strftime('%d.%m.%Y')}, "
+                    f"{', '.join(countries)}</b>\n\n") \
+        if movie['release_date'] else ''
+    genres = f"🎭 {i18n.get('genres')} <b>{', '.join([genre['name'] for genre in movie['genres']])}</b>\n\n" \
+        if movie['genres'] else ''
+    tagline = f"📝 {i18n.get('tagline')} <b>{movie['tagline']}</b>\n\n" \
+        if movie['tagline'] else ''
+    runtime = f"🕒 {i18n.get('runtime')} <b>{movie['runtime']} {i18n.get('minutes')}</b>\n\n" \
+        if movie['runtime'] else ''
+    overview = f"📄 {i18n.get('overview')} <b>{movie['overview']}</b>\n\n" \
+        if movie['overview'] else ''
+    rating = f"⭐️ {i18n.get('rating')} <b>{movie['vote_average']}</b>\n\n" \
+        if movie['vote_average'] else ''
+    adult = f"🔞 <b>{i18n.get('adult')}</b>\n\n" \
+        if movie['adult'] else ''
+
+    movie_info = (f"{movie_title} {original_movie_title}\n\n"
+                  f"{rating}"
+                  f"{release_date}"
+                  f"{adult}"
+                  f"{genres}"
+                  f"{runtime}"  
+                  f"{tagline}"
+                  f"{overview}"
+                  )
+
+    poster_url = f"https://image.tmdb.org/t/p/w500{movie['poster_path']}"
+    is_poster = movie['poster_path'] is not None
+
+    return {
+        "movie_info": movie_info,
+        "is_poster": is_poster,
+        "poster": MediaAttachment(ContentType.PHOTO,
+                                  url=poster_url)
+    }
+
 
 
 main_menu = Dialog(
@@ -243,9 +323,10 @@ main_menu = Dialog(
             Select(
                 Format("{item[0]}"),
                 id="s_movies",
-                item_id_getter=operator.itemgetter(1),
+                item_id_getter=lambda item: item[1],
                 items="movies_on_page",
-                when=~F["is_empty"]
+                when=~F["is_empty"],
+                on_click=on_movie_details
             )
         ),
         Row(
@@ -278,8 +359,10 @@ main_menu = Dialog(
             ),
             Button(
                 Multi(
-                    I18NFormat("order-asc", when=~F["sorting_order"]),
-                    I18NFormat("order-desc", when=F["sorting_order"]),
+                    I18NFormat("order-asc", when=~F["sorting_order"] & F["sorting_type"]),
+                    I18NFormat("order-desc", when=F["sorting_order"] & F["sorting_type"]),
+                    I18NFormat("last-added", when=F["sorting_order"] & ~F["sorting_type"]),
+                    I18NFormat("first-added", when=~F["sorting_order"] & ~F["sorting_type"]),
                 ),
                 id="sorting_order",
                 on_click=on_sorting_order,
@@ -340,5 +423,23 @@ main_menu = Dialog(
         ),
         state=MainMenu.add_movie,
         getter=get_add_movies_list
+    ),
+    # Movie details window
+    Window(
+        Format("{movie_info}"),
+        Button(
+            Const("reload"),
+            id="reload",
+        ),
+        Button(
+            I18NFormat("go-back"),
+            id="go_back",
+            on_click=on_back
+        ),
+        DynamicMedia("poster",
+                     when=F["is_poster"]),
+
+        state=MainMenu.show_details,
+        getter=get_movie_details
     )
 )

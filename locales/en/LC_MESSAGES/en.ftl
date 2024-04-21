@@ -11,10 +11,13 @@ chosen-language =
 get-started =
     Get started!
 no-movies =
-    Oops! It looks like you haven't added any movies yet.
-    Let's add some! Just type the name of the movie you want to add.
+    Oops! It looks like you haven't added any movies yet. Let's add some! Just type the name of the movie you want to add.
 show-movies =
-    Here is the list of all movies you have added:
+    To add the movie to the list, type the name of the movie you want to add.
+
+    To see the description of the movie, just click on the movie title.
+
+    Here is the list of all movies you have added ⬇️
 get-description =
     Get details
 arrow-up =
@@ -33,10 +36,35 @@ order-asc =
     Order: ascending
 order-desc =
     Order: descending
+last-added =
+    Order: last added
+first-added =
+    Order: first added
 choose-movie-to-add =
     Choose the movie you want to add to the list:
 go-back =
     ⬅️ Go back!
 no-movies-found =
     Oops! No movies were found 😓
+movie-title =
+    Movie title:
+original-title =
+    Original title:
+release-date =
+    Release, country:
+genres =
+    Genres:
+tagline =
+    Tagline:
+runtime =
+    Runtime:
+minutes =
+    min.
+overview =
+    Overview:
+rating =
+    Rating:
+is_adult =
+    Content rating is 18+ 🔞
+
 

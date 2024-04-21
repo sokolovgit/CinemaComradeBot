@@ -22,6 +22,7 @@ async def db_add_user(session: AsyncSession, data: dict):
 
     new_user = User(
         tg_id=data["tg_id"],
+        user_name=data["user_name"],
     )
 
     session.add(new_user)
@@ -50,7 +51,7 @@ async def db_get_users_movies(session: AsyncSession, tg_id: int):
     return result.scalars().all()
 
 
-async def db_add_movie_to_user(session: AsyncSession, tg_id: int, tmdb_id: int):
+async def db_add_movie_to_user(session: AsyncSession, tg_id: int, data: dict):
     # Query the user by tg_id
     user = await session.execute(select(User).where(User.tg_id == tg_id))
     user_in_db = user.scalars().first()
@@ -62,36 +63,52 @@ async def db_add_movie_to_user(session: AsyncSession, tg_id: int, tmdb_id: int):
     logger.info("User tg_id=%s found in the database", tg_id)
 
     # Query the movie by tmdb_id
-    movie = await session.execute(select(Movie).where(Movie.tmdb_id == tmdb_id))
+    movie = await session.execute(select(Movie).where(Movie.tmdb_id == data['tmdb_id']))
     movie_in_db = movie.scalars().first()
 
     if not movie_in_db:
-        await db_add_movie(session, tmdb_id)
+        await db_add_movie(session, data)
 
-    logger.info("Movie tmdb_id=%s found in the database", tmdb_id)
+    logger.info("Movie tmdb_id=%s found in the database", data['tmdb_id'])
+
+    # Check if movie already added to user
+    user_movie = await session.execute(select(user_movie_association).
+                                       where(user_movie_association.c.user_tg_id == tg_id,
+                                             user_movie_association.c.movie_tmdb_id == data['tmdb_id']))
+    user_movie_in_db = user_movie.scalars().first()
+
+    if user_movie_in_db:
+        logger.info("Movie tmdb_id=%s already added to user tg_id=%s", data['tmdb_id'], tg_id)
+        return
 
     await session.execute(user_movie_association.
                           insert().
                           values(user_tg_id=tg_id,
-                                 movie_tmdb_id=tmdb_id))
+                                 movie_tmdb_id=data['tmdb_id']))
     await session.commit()
-    logger.info("Movie tmdb_id=%s added to user tg_id=%s", tmdb_id, tg_id)
+    logger.info("Movie tmdb_id=%s added to user tg_id=%s", data['tmdb_id'], tg_id)
 
 
-async def db_add_movie(session: AsyncSession, tmdb_id: int):
+async def db_add_movie(session: AsyncSession, data: dict):
     # Check if the movie already exists in the database
-    existing_movie = await session.execute(select(Movie).where(Movie.tmdb_id == tmdb_id))
+    existing_movie = await session.execute(select(Movie).where(Movie.tmdb_id == data['tmdb_id']))
     movie_in_db = existing_movie.scalars().first()
 
     if movie_in_db:
-        logger.info("Movie tmdb_id=%s already exists in the database", tmdb_id)
-        return movie_in_db
+        logger.info("Movie tmdb_id=%s already exists in the database", data['tmdb_id'])
+        return
 
     # Movie does not exist, create and add it to the database
-    new_movie = Movie(tmdb_id=tmdb_id)
+    new_movie = Movie(tmdb_id=data['tmdb_id'], movie_name=data['movie_name'])
     session.add(new_movie)
     await session.commit()
-    logger.info("New movie tmdb_id=%s added to the database", tmdb_id)
+    logger.info("New movie tmdb_id=%s added to the database", data['tmdb_id'])
+
+
+async def db_get_movie_added_time(session: AsyncSession, tg_id: int, movie_id: int):
+    stmt = select(user_movie_association.c.added_at).where(user_movie_association.c.user_tg_id == tg_id, user_movie_association.c.movie_tmdb_id == movie_id)
+    result = await session.execute(stmt)
+    return result.scalar()
 
 
 

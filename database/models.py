@@ -12,7 +12,7 @@ user_movie_association = Table(
     'user_movie_association', Base.metadata,
     Column('user_tg_id', ForeignKey('users.tg_id'), primary_key=True),
     Column('movie_tmdb_id', ForeignKey('movies.tmdb_id'), primary_key=True),
-    Column('added_at', DateTime, server_default=func.now())  # Add a column for the timestamp
+    Column('added_at', DateTime, server_default=func.now())
 )
 
 movie_genre_association = Table(
@@ -26,6 +26,7 @@ class User(Base):
     __tablename__ = 'users'
 
     tg_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_name: Mapped[str] = mapped_column(String)
     liked_movies: Mapped[List["Movie"]] = relationship(
         secondary=user_movie_association,
         back_populates="users"
@@ -36,6 +37,7 @@ class Movie(Base):
     __tablename__ = 'movies'
 
     tmdb_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    movie_name: Mapped[str] = mapped_column(String)
     genres: Mapped[List["Genres"]] = relationship(secondary=movie_genre_association)
     users: Mapped[List["User"]] = relationship(
         secondary=user_movie_association,

@@ -18,7 +18,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 
 from aiogram_i18n import I18nMiddleware
-from aiogram_i18n.cores import FluentCompileCore, FluentRuntimeCore
+from aiogram_i18n.cores import FluentRuntimeCore
 
 from aiogram_dialog import setup_dialogs
 

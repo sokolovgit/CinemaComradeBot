@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from settings import settings
 
-from enums import Language
+from enums.language import Language
+from enums.sorting import SortingType, SortingOrder
 from states.change_language import ChangeLanguage
 from states.main_menu import MainMenu
 from utils.i18n_format import I18NFormat
@@ -24,7 +25,8 @@ async def start_language(message: Message, i18n: I18nContext,
                          dialog_manager: DialogManager, session: AsyncSession):
     tg_id = message.from_user.id
     data = {
-        "tg_id": tg_id
+        "tg_id": tg_id,
+        "user_name": f"{message.from_user.first_name} {message.from_user.last_name}",
     }
 
     try:
@@ -58,7 +60,10 @@ async def get_user_info(event_isolation, dialog_manager: DialogManager, *args, *
 
 
 async def on_start_workflow(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
-    await dialog_manager.start(MainMenu.show_list, data={"tg_id": callback.from_user.id})
+    await dialog_manager.start(MainMenu.show_list,
+                               data={"tg_id": callback.from_user.id,
+                                     }
+                               )
 
 
 start = Dialog(

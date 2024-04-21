@@ -5,4 +5,5 @@ class MainMenu(StatesGroup):
     show_list = State()
     change_language = State()
     add_movie = State()
+    show_details = State()
 
