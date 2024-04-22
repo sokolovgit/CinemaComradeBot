@@ -4,6 +4,8 @@ choose-language =
     Please, choose language you want to use:
 en = English
 uk = Українська
+yes = Yes
+no = No
 -en = English
 -uk = Українська
 chosen-language =
@@ -66,5 +68,14 @@ rating =
     Rating:
 is_adult =
     Content rating is 18+ 🔞
-
+delete-movie =
+    Delete movie
+movie-is-watched =
+    Movie is watched: ✅
+movie-not-watched =
+    Movie is watched: ❌
+leave-review =
+    Would you like to leave a review?
+how-would-rate =
+    How would you rate this movie?
 

@@ -1,3 +1,4 @@
+import asyncio
 import operator
 import typing
 from typing import Any
@@ -12,13 +13,14 @@ from aiogram import F
 from aiogram.types import CallbackQuery, Message, ContentType
 from aiogram_dialog import DialogManager, Dialog, Window, StartMode, ShowMode
 from aiogram_dialog.widgets.text import Format, Multi, List, Const
-from aiogram_dialog.widgets.kbd import Row, Button, Select, Column
-from aiogram_dialog.widgets.media import StaticMedia, DynamicMedia
+from aiogram_dialog.widgets.kbd import Row, Button, Select, Column, Checkbox, ManagedCheckbox
+from aiogram_dialog.widgets.media import DynamicMedia
 from aiogram_i18n import I18nContext
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.requests import db_get_users_movies, db_get_all_movies, db_add_movie_to_user, db_get_movie_added_time
+from database.requests import db_get_users_movies, db_get_all_movies, db_add_movie_to_user, db_get_movie_added_time, \
+    db_delete_movie_from_user, db_get_users_movie_data, db_change_movie_state, db_get_movie_state_for_user
 
 from utils.logger import setup_logger
 from utils.i18n_format import I18NFormat
@@ -227,7 +229,7 @@ async def on_back(callback: CallbackQuery, button: Button, dialog_manager: Dialo
 
 
 async def on_movie_to_add(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
-    tg_id: int = dialog_manager.dialog_data.get("tg_id")
+    tg_id: int = callback.from_user.id
     session: AsyncSession = dialog_manager.middleware_data.get("session")
     tmdb_id = int(item_id)
 
@@ -251,22 +253,61 @@ async def on_movie_to_add(callback: CallbackQuery, widget: Any, dialog_manager: 
 
 
 async def on_movie_details(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
+
     await dialog_manager.start(
         MainMenu.show_details,
         mode=StartMode.RESET_STACK,
         show_mode=ShowMode.EDIT,
-        data={"movie_id": item_id}
+        data={"movie_id": item_id,
+              "tg_id": callback.from_user.id}
     )
+
+
+async def on_delete(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    tg_id = callback.from_user.id
+    session = dialog_manager.middleware_data.get("session")
+    movie_id = dialog_manager.start_data["movie_id"]
+
+    await db_delete_movie_from_user(session, tg_id, movie_id)
+
+    await dialog_manager.start(MainMenu.show_list,
+                               mode=StartMode.RESET_STACK,
+                               show_mode=ShowMode.EDIT,
+                               data={"tg_id": tg_id})
+
+
+async def on_state_changed(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    tg_id = callback.from_user.id
+    session = dialog_manager.middleware_data.get("session")
+    movie_id = dialog_manager.start_data["movie_id"]
+    is_watched = await db_get_movie_state_for_user(session, tg_id, movie_id)
+
+    await db_change_movie_state(session, tg_id, movie_id, is_watched)
+
+    if not is_watched:
+        await dialog_manager.start(MainMenu.ask_to_leave_review,
+                                   mode=StartMode.RESET_STACK,
+                                   show_mode=ShowMode.EDIT,
+                                   data={"movie_id": movie_id})
+    else:
+        await dialog_manager.start(MainMenu.show_details,
+                                   mode=StartMode.RESET_STACK,
+                                   show_mode=ShowMode.EDIT,
+                                   data={"movie_id": movie_id,
+                                         "tg_id": tg_id})
 
 
 async def get_movie_details(event_isolation, dialog_manager: DialogManager, session: AsyncSession, i18n: I18nContext,
                             *args, **kwargs):
+    #await asyncio.sleep(0.1)
+
     movie_id = dialog_manager.start_data["movie_id"]
+    tg_id = dialog_manager.start_data["tg_id"]
     movie = tmdb.Movies(id=movie_id).info(language=i18n.locale)
 
-    countries = [country['iso_3166_1'] for country in movie['production_countries']]
+    users_movie_info = await db_get_users_movie_data(session, tg_id, movie_id)
 
-    print(countries)
+    countries = [country['iso_3166_1'] for country in movie['production_countries']]
 
     movie_title = f"🎬 {i18n.get('movie-title')} <b>{movie['title']}</b>"
     original_movie_title = f"<b>({movie['original_title']})</b>" \
@@ -294,7 +335,7 @@ async def get_movie_details(event_isolation, dialog_manager: DialogManager, sess
                   f"{release_date}"
                   f"{adult}"
                   f"{genres}"
-                  f"{runtime}"  
+                  f"{runtime}"
                   f"{tagline}"
                   f"{overview}"
                   )
@@ -306,9 +347,26 @@ async def get_movie_details(event_isolation, dialog_manager: DialogManager, sess
         "movie_info": movie_info,
         "is_poster": is_poster,
         "poster": MediaAttachment(ContentType.PHOTO,
-                                  url=poster_url)
+                                  url=poster_url),
+        "is_watched": users_movie_info["is_watched"]
     }
 
+
+async def get_rating_keyboard(event_isolation, *args, **kwargs):
+    buttons = []
+    for i in range(1, 11):
+        buttons.append((str(i), i))
+
+    return {"buttons": buttons}
+
+
+async def on_add_review(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    pass
+    #await dialog_manager.start(MainMenu.leave_rating, )
+
+
+async def on_chosen_rating(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
+    dialog_manager.dialog_data["rating"] = item_id
 
 
 main_menu = Dialog(
@@ -428,18 +486,72 @@ main_menu = Dialog(
     Window(
         Format("{movie_info}"),
         Button(
-            Const("reload"),
-            id="reload",
+            I18NFormat("delete-movie"),
+            id="delete_movie",
+            on_click=on_delete
         ),
         Button(
             I18NFormat("go-back"),
             id="go_back",
             on_click=on_back
         ),
+        Button(
+            Multi(
+                I18NFormat("movie-is-watched",
+                           when=F["is_watched"]),
+                I18NFormat("movie-not-watched",
+                           when=~F["is_watched"]),
+            ),
+            id="is_watched",
+            on_click=on_state_changed
+
+        ),
         DynamicMedia("poster",
                      when=F["is_poster"]),
 
         state=MainMenu.show_details,
         getter=get_movie_details
+    ),
+    # ask user to leave review window
+    Window(
+        I18NFormat("leave-review"),
+        Row(
+            Button(
+                I18NFormat("yes"),
+                id="yes",
+                on_click=on_add_review
+            ),
+            Button(
+                I18NFormat("no"),
+                id="no",
+                on_click=on_back
+            )
+        ),
+        state=MainMenu.ask_to_leave_review
+    ),
+    # choose rating window
+    Window(
+        I18NFormat("how-would-rate"),
+        Row(
+            Select(
+                Format("{item[0]}"),
+                id="rating",
+
+                on_click=on_chosen_rating
+            ),
+        ),
+        state=MainMenu.leave_rating,
+        getter=get_rating_keyboard
+    ),
+    # leave review window
+    Window(
+        I18NFormat("leave-review"),
+        Button(
+            I18NFormat("go-back"),
+            id="go_back",
+            on_click=on_back
+        ),
+        state=MainMenu.leave_review
     )
 )
+

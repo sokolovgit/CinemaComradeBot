@@ -1,6 +1,6 @@
 from typing import List
 
-from sqlalchemy import BigInteger, String, Table, ForeignKey, Column, DateTime, func
+from sqlalchemy import BigInteger, String, Table, ForeignKey, Column, DateTime, func, Boolean
 from sqlalchemy.orm import relationship, Mapped, DeclarativeBase, mapped_column
 
 
@@ -12,6 +12,9 @@ user_movie_association = Table(
     'user_movie_association', Base.metadata,
     Column('user_tg_id', ForeignKey('users.tg_id'), primary_key=True),
     Column('movie_tmdb_id', ForeignKey('movies.tmdb_id'), primary_key=True),
+    Column('is_watched', Boolean, default=False),
+    Column('personal_rating', BigInteger, default=None),
+    Column('personal_review', String, default=None),
     Column('added_at', DateTime, server_default=func.now())
 )
 

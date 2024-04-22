@@ -106,9 +106,82 @@ async def db_add_movie(session: AsyncSession, data: dict):
 
 
 async def db_get_movie_added_time(session: AsyncSession, tg_id: int, movie_id: int):
-    stmt = select(user_movie_association.c.added_at).where(user_movie_association.c.user_tg_id == tg_id, user_movie_association.c.movie_tmdb_id == movie_id)
+    stmt = select(user_movie_association.c.added_at).where(user_movie_association.c.user_tg_id == tg_id,
+                                                           user_movie_association.c.movie_tmdb_id == movie_id)
     result = await session.execute(stmt)
     return result.scalar()
+
+
+async def db_delete_movie_from_user(session, tg_id, movie_id):
+    await session.execute(user_movie_association.delete().where(user_movie_association.c.user_tg_id == tg_id,
+                                                                user_movie_association.c.movie_tmdb_id == movie_id))
+    await session.commit()
+    logger.info("Movie tmdb_id=%s deleted from user tg_id=%s", movie_id, tg_id)
+
+
+async def db_get_users_movie_data(session: AsyncSession, tg_id: int, movie_id: int):
+    stmt = (
+        select(
+            user_movie_association.c.is_watched,
+            user_movie_association.c.personal_rating,
+            user_movie_association.c.personal_review
+        )
+        .where(
+            (user_movie_association.c.user_tg_id == tg_id) &
+            (user_movie_association.c.movie_tmdb_id == movie_id)
+        )
+    )
+    result = await session.execute(stmt)
+    user_movie_data = result.fetchone()
+
+    if user_movie_data is None:
+        logger.info("No user movie data found for tg_id=%s and movie_id=%s", tg_id, movie_id)
+        return None
+
+    data = {
+        "is_watched": user_movie_data[0],
+        "personal_rating": user_movie_data[1],
+        "personal_review": user_movie_data[2],
+    }
+
+    logger.info(f"User movie data: {data}")
+
+    return data
+
+
+async def db_change_movie_state(session: AsyncSession, tg_id: int, movie_id: int, state: bool):
+    new_state = not state
+
+    await session.execute(user_movie_association.update().
+                          where(user_movie_association.c.user_tg_id == tg_id,
+                                user_movie_association.c.movie_tmdb_id == movie_id).
+                          values(is_watched=new_state))
+    await session.commit()
+
+    if new_state:
+        logger.info("Movie tmdb_id=%s marked as watched for user tg_id=%s", movie_id, tg_id)
+    else:
+        logger.info("Movie tmdb_id=%s marked as unwatched for user tg_id=%s", movie_id, tg_id)
+
+
+async def db_get_movie_state_for_user(session: AsyncSession, tg_id: int, movie_id: int):
+    stmt = select(user_movie_association.c.is_watched).where(user_movie_association.c.user_tg_id == tg_id,
+                                                             user_movie_association.c.movie_tmdb_id == movie_id)
+    result = await session.execute(stmt)
+    return result.scalar()
+
+
+async def db_leave_review(session: AsyncSession, tg_id: int, movie_id: int, data: dict):
+    await session.execute(user_movie_association.update().
+                          where(user_movie_association.c.user_tg_id == tg_id,
+                                user_movie_association.c.movie_tmdb_id == movie_id).
+                          values(personal_rating=data['rating'],
+                                 personal_review=data['review']))
+    await session.commit()
+    logger.info("User tg_id=%s left a review for movie tmdb_id=%s", tg_id, movie_id)
+
+
+
 
 
 

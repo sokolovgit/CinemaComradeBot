@@ -4,6 +4,8 @@ choose-language =
     Будь ласка, виберіть мову якою ви хочете користуватися:
 en = English
 uk = Українська
+yes = Так
+no = Ні
 -en = English
 -uk = Українська
 chosen-language =
@@ -66,3 +68,14 @@ rating =
     Рейтинг:
 is_adult =
     Контент 18+
+delete-movie =
+    Видалити фільм
+movie-is-watched =
+    Фільм переглянуто: ✅
+movie-not-watched =
+    Фільм переглянуто: ❌
+leave-review =
+    Чи хочете залишити відгук?
+how-would-rate =
+    Як ви оціните цей фільм?
+
