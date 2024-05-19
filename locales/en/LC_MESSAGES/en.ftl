@@ -78,4 +78,6 @@ leave-review =
     Would you like to leave a review?
 how-would-rate =
     How would you rate this movie?
+enter-review =
+    Send your opinion about the movie or return to the main menu
 

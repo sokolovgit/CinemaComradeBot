@@ -1,5 +1,3 @@
-import asyncio
-import operator
 import typing
 from typing import Any
 from datetime import datetime
@@ -20,7 +18,8 @@ from aiogram_i18n import I18nContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.requests import db_get_users_movies, db_get_all_movies, db_add_movie_to_user, db_get_movie_added_time, \
-    db_delete_movie_from_user, db_get_users_movie_data, db_change_movie_state, db_get_movie_state_for_user
+    db_delete_movie_from_user, db_get_users_movie_data, db_change_movie_state, db_get_movie_state_for_user, \
+    db_leave_review
 
 from utils.logger import setup_logger
 from utils.i18n_format import I18NFormat
@@ -357,16 +356,37 @@ async def get_rating_keyboard(event_isolation, *args, **kwargs):
     for i in range(1, 11):
         buttons.append((str(i), i))
 
-    return {"buttons": buttons}
+    return {"first_row_buttons": buttons[:5],
+            "second_row_buttons": buttons[5:]}
 
 
 async def on_add_review(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
-    pass
-    #await dialog_manager.start(MainMenu.leave_rating, )
+    await dialog_manager.start(MainMenu.leave_rating,
+                               mode=StartMode.RESET_STACK,
+                               show_mode=ShowMode.EDIT,
+                               data={"movie_id": dialog_manager.start_data["movie_id"]}
+    )
 
 
 async def on_chosen_rating(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
-    dialog_manager.dialog_data["rating"] = item_id
+    await dialog_manager.start(MainMenu.leave_review,
+                               mode=StartMode.RESET_STACK,
+                               show_mode=ShowMode.EDIT,
+                               data={"rating": item_id,
+                                     "movie_id": dialog_manager.start_data["movie_id"]})
+
+
+async def get_users_review(message: Message, dialog_manager: DialogManager, session: AsyncSession):
+    rating = dialog_manager.start_data["rating"]
+    movie_id = dialog_manager.start_data["movie_id"]
+    review = message.text
+
+    data = {
+        "rating": rating,
+        "review": review
+    }
+
+    await db_leave_review(session, message.from_user.id, movie_id, data)
 
 
 main_menu = Dialog(
@@ -536,7 +556,17 @@ main_menu = Dialog(
             Select(
                 Format("{item[0]}"),
                 id="rating",
-
+                item_id_getter=lambda item: item[1],
+                items="first_row_buttons",
+                on_click=on_chosen_rating
+            ),
+        ),
+        Row(
+            Select(
+                Format("{item[0]}"),
+                id="rating",
+                item_id_getter=lambda item: item[1],
+                items="second_row_buttons",
                 on_click=on_chosen_rating
             ),
         ),
@@ -545,13 +575,13 @@ main_menu = Dialog(
     ),
     # leave review window
     Window(
-        I18NFormat("leave-review"),
+        I18NFormat("enter-review"),
         Button(
             I18NFormat("go-back"),
             id="go_back",
             on_click=on_back
         ),
+
         state=MainMenu.leave_review
     )
 )
-
