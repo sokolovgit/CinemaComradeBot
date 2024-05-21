@@ -161,6 +161,7 @@ async def db_change_movie_state(session: AsyncSession, tg_id: int, movie_id: int
     if new_state:
         logger.info("Movie tmdb_id=%s marked as watched for user tg_id=%s", movie_id, tg_id)
     else:
+        await db_remove_personal_data(session, tg_id, movie_id)
         logger.info("Movie tmdb_id=%s marked as unwatched for user tg_id=%s", movie_id, tg_id)
 
 
@@ -179,6 +180,16 @@ async def db_leave_review(session: AsyncSession, tg_id: int, movie_id: int, data
                                  personal_review=data['review']))
     await session.commit()
     logger.info("User tg_id=%s left a review for movie tmdb_id=%s", tg_id, movie_id)
+
+
+async def db_remove_personal_data(session: AsyncSession, tg_id: int, movie_id: int):
+    await session.execute(user_movie_association.update().
+                          where(user_movie_association.c.user_tg_id == tg_id,
+                                user_movie_association.c.movie_tmdb_id == movie_id).
+                          values(personal_rating=None,
+                                 personal_review=None))
+    await session.commit()
+    logger.info("Personal data removed for user tg_id=%s and movie tmdb_id=%s", tg_id, movie_id)
 
 
 

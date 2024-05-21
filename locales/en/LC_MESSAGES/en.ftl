@@ -79,5 +79,24 @@ leave-review =
 how-would-rate =
     How would you rate this movie?
 enter-review =
-    Send your opinion about the movie or return to the main menu
-
+    Send your opinion about the movie or return
+add-movie =
+    Add movie
+personal-review =
+    Personal review:
+no-personal-review =
+    No personal review yet
+no-personal-rating =
+    No personal rating yet
+personal-rating =
+    Your rating:
+personal-overview =
+    Your review:
+error-limit =
+    Your review is too long. Please limit it to 200 characters.
+language =
+    🌐 Change language
+random =
+    Get random movie
+choose-action =
+    Choose action

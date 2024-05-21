@@ -1,9 +1,13 @@
 import typing
+from asyncio import sleep
 from typing import Any
 from datetime import datetime
 
 import tmdbsimple as tmdb
-from aiogram_dialog.api.entities import MediaAttachment, MediaId
+from aiogram.fsm.context import FSMContext
+from aiogram.methods import DeleteMessage
+from aiogram_dialog.api.entities import MediaAttachment
+from aiogram_dialog.widgets.input import MessageInput
 
 from settings import settings
 
@@ -29,13 +33,15 @@ from states.main_menu import MainMenu
 from enums.language import Language
 from enums.sorting import SortingType, SortingOrder
 
+from keyboards.main_keyboard import main_keyboard
+
 logger = setup_logger()
 tmdb.API_KEY = settings.TMDB_API_KEY.get_secret_value()
 
 
 async def get_movies_list(event_isolation, dialog_manager: DialogManager,
                           session: AsyncSession, i18n: I18nContext, *args, **kwargs):
-    dialog_manager.dialog_data["tg_id"] = dialog_manager.start_data["tg_id"]
+    dialog_manager.dialog_data["tg_id"] = dialog_manager.middleware_data.get("event_from_user").id
     dialog_manager.dialog_data.setdefault("page_size", settings.PAGE_SIZE)
     dialog_manager.dialog_data.setdefault("current_page", 1)
     dialog_manager.dialog_data.setdefault("sorting_type", SortingType.MOVIE_RATE)
@@ -56,6 +62,12 @@ async def get_movies_list(event_isolation, dialog_manager: DialogManager,
 
     movies_info = await fetch_movie_details(db_movies, i18n.locale, dialog_manager, session)
     movies_on_page = await make_list(movies_info, dialog_manager, i18n)
+
+    # chatid = dialog_manager.middleware_data.get("event_chat").id
+    # print(dialog_manager.middleware_data)
+    # print(dialog_manager.middleware_data.get("event_chat").id)
+    # bot = dialog_manager.middleware_data.get("bot")
+    # await bot.send_message(text=str(chatid), chat_id=chatid, reply_markup=main_keyboard(i18n))
 
     return {
         "is_empty": is_empty,
@@ -176,10 +188,11 @@ async def change_language(message: Message, dialog_manager: DialogManager):
     await message.delete()
 
 
-async def add_movie(message: Message, dialog_manager: DialogManager, i18n: I18nContext):
+async def add_movie(message: Message, dialog_manager: DialogManager, i18n: I18nContext, state: FSMContext):
     await dialog_manager.start(MainMenu.add_movie, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT,
                                data={"tg_id": message.from_user.id,
                                      "message": message.text})
+
     await message.delete()
 
 
@@ -202,13 +215,14 @@ async def get_add_movies_list(event_isolation, dialog_manager: DialogManager, i1
         movies.append((movie_str, movie['id']))
 
     movies_num = len(movies)
-    dialog_manager.dialog_data["pages_num"] = movies_num // settings.PAGE_SIZE
-
     page_size = dialog_manager.dialog_data["page_size"]
+    dialog_manager.dialog_data["pages_num"] = movies_num // page_size if movies_num % page_size == 0 else movies_num // page_size + 1
+
     current_page = dialog_manager.dialog_data["current_page"]
 
     start = (current_page - 1) * page_size
     end = start + page_size
+    end = min(end, movies_num)  # Ensure 'end' does not exceed the length of the movies list
 
     movies = movies[start:end]
 
@@ -225,6 +239,16 @@ async def on_back(callback: CallbackQuery, button: Button, dialog_manager: Dialo
                                mode=StartMode.RESET_STACK,
                                show_mode=ShowMode.EDIT,
                                data={"tg_id": callback.from_user.id})
+
+
+async def on_back_to_movie(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    await dialog_manager.start(MainMenu.show_details,
+                               mode=StartMode.RESET_STACK,
+                               show_mode=ShowMode.EDIT,
+                               data={"movie_id": dialog_manager.start_data["movie_id"],
+                                     "tg_id": callback.from_user.id
+                                     }
+                               )
 
 
 async def on_movie_to_add(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
@@ -298,10 +322,8 @@ async def on_state_changed(callback: CallbackQuery, button: Button, dialog_manag
 
 async def get_movie_details(event_isolation, dialog_manager: DialogManager, session: AsyncSession, i18n: I18nContext,
                             *args, **kwargs):
-    #await asyncio.sleep(0.1)
-
     movie_id = dialog_manager.start_data["movie_id"]
-    tg_id = dialog_manager.start_data["tg_id"]
+    tg_id = dialog_manager.middleware_data.get("event_from_user").id
     movie = tmdb.Movies(id=movie_id).info(language=i18n.locale)
 
     users_movie_info = await db_get_users_movie_data(session, tg_id, movie_id)
@@ -312,22 +334,26 @@ async def get_movie_details(event_isolation, dialog_manager: DialogManager, sess
     original_movie_title = f"<b>({movie['original_title']})</b>" \
         if movie['original_language'] != i18n.locale else ''
 
+    rating = f"⭐️ {i18n.get('rating')} <b>{movie['vote_average']}</b>\n\n" \
+        if movie['vote_average'] else ''
     release_date = (f"📅 {i18n.get('release-date')} "
                     f"<b>{datetime.strptime(movie['release_date'], '%Y-%m-%d').strftime('%d.%m.%Y')}, "
                     f"{', '.join(countries)}</b>\n\n") \
         if movie['release_date'] else ''
-    genres = f"🎭 {i18n.get('genres')} <b>{', '.join([genre['name'] for genre in movie['genres']])}</b>\n\n" \
-        if movie['genres'] else ''
-    tagline = f"📝 {i18n.get('tagline')} <b>{movie['tagline']}</b>\n\n" \
-        if movie['tagline'] else ''
-    runtime = f"🕒 {i18n.get('runtime')} <b>{movie['runtime']} {i18n.get('minutes')}</b>\n\n" \
-        if movie['runtime'] else ''
-    overview = f"📄 {i18n.get('overview')} <b>{movie['overview']}</b>\n\n" \
-        if movie['overview'] else ''
-    rating = f"⭐️ {i18n.get('rating')} <b>{movie['vote_average']}</b>\n\n" \
-        if movie['vote_average'] else ''
     adult = f"🔞 <b>{i18n.get('adult')}</b>\n\n" \
         if movie['adult'] else ''
+    genres = f"🎭 {i18n.get('genres')} <b>{', '.join([genre['name'] for genre in movie['genres']])}</b>\n\n" \
+        if movie['genres'] else ''
+    runtime = f"🕒 {i18n.get('runtime')} <b>{movie['runtime']} {i18n.get('minutes')}</b>\n\n" \
+        if movie['runtime'] else ''
+    tagline = f"📝 {i18n.get('tagline')} <b>{movie['tagline']}</b>\n\n" \
+        if movie['tagline'] else ''
+    overview = f"📄 {i18n.get('overview')} <b>{movie['overview']}</b>\n\n" \
+        if movie['overview'] else ''
+    personal_overview = (f"{'~' * 25}\n"
+                         f"{i18n.get('personal-rating')} <b>{str(users_movie_info['personal_rating']) + ' ⭐' if users_movie_info['personal_rating'] is not None else i18n.get('no-personal-rating')}️</b>\n" 
+                         f"{i18n.get('personal-overview')} <b>{users_movie_info['personal_review'] if users_movie_info['personal_review'] is not None else i18n.get('no-personal-review')}</b>\n"
+                         ) if users_movie_info['is_watched'] else ''
 
     movie_info = (f"{movie_title} {original_movie_title}\n\n"
                   f"{rating}"
@@ -337,6 +363,7 @@ async def get_movie_details(event_isolation, dialog_manager: DialogManager, sess
                   f"{runtime}"
                   f"{tagline}"
                   f"{overview}"
+                  f"{personal_overview}"
                   )
 
     poster_url = f"https://image.tmdb.org/t/p/w500{movie['poster_path']}"
@@ -362,24 +389,36 @@ async def get_rating_keyboard(event_isolation, *args, **kwargs):
 
 async def on_add_review(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
     await dialog_manager.start(MainMenu.leave_rating,
-                               mode=StartMode.RESET_STACK,
                                show_mode=ShowMode.EDIT,
                                data={"movie_id": dialog_manager.start_data["movie_id"]}
-    )
+                               )
 
 
 async def on_chosen_rating(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
-    await dialog_manager.start(MainMenu.leave_review,
-                               mode=StartMode.RESET_STACK,
-                               show_mode=ShowMode.EDIT,
-                               data={"rating": item_id,
-                                     "movie_id": dialog_manager.start_data["movie_id"]})
+    data = {"rating": item_id,
+            "movie_id": dialog_manager.start_data["movie_id"],
+            }
+    session = dialog_manager.middleware_data.get("session")
+
+    await db_leave_review(session, callback.from_user.id, data["movie_id"], {"rating": item_id, "review": None})
+    dialog_manager.dialog_data.update(data)
+
+    await dialog_manager.next()
 
 
-async def get_users_review(message: Message, dialog_manager: DialogManager, session: AsyncSession):
-    rating = dialog_manager.start_data["rating"]
-    movie_id = dialog_manager.start_data["movie_id"]
+async def get_users_review(message: Message,  message_input: MessageInput, dialog_manager: DialogManager):
+    rating = dialog_manager.dialog_data["rating"]
+    movie_id = dialog_manager.dialog_data["movie_id"]
+    session = dialog_manager.middleware_data.get("session")
     review = message.text
+
+    if len(review) > 150:
+        i18n = dialog_manager.middleware_data.get("i18n")
+        bot_message = await message.answer(i18n.get("error-limit"))
+        await sleep(5)
+        await bot_message.delete()
+        await message.delete()
+        return await dialog_manager.switch_to(MainMenu.leave_review, show_mode=ShowMode.EDIT)
 
     data = {
         "rating": rating,
@@ -387,6 +426,18 @@ async def get_users_review(message: Message, dialog_manager: DialogManager, sess
     }
 
     await db_leave_review(session, message.from_user.id, movie_id, data)
+    await dialog_manager.switch_to(MainMenu.show_details, show_mode=ShowMode.EDIT)
+    await message.delete()
+
+
+async def movie_name_input(message: Message, message_input: MessageInput, dialog_manager: DialogManager):
+    await dialog_manager.start(MainMenu.add_movie, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT,
+                               data={"tg_id": message.from_user.id,
+                                     "message": message.text})
+
+    await message.delete()
+
+
 
 
 main_menu = Dialog(
@@ -446,6 +497,10 @@ main_menu = Dialog(
                 on_click=on_sorting_order,
                 when=~F["is_empty"]
             )
+        ),
+        MessageInput(
+            func=movie_name_input,
+            content_types=[ContentType.TEXT],
         ),
         state=MainMenu.show_list,
         getter=get_movies_list
@@ -544,7 +599,7 @@ main_menu = Dialog(
             Button(
                 I18NFormat("no"),
                 id="no",
-                on_click=on_back
+                on_click=on_back_to_movie
             )
         ),
         state=MainMenu.ask_to_leave_review
@@ -579,9 +634,12 @@ main_menu = Dialog(
         Button(
             I18NFormat("go-back"),
             id="go_back",
-            on_click=on_back
+            on_click=on_back_to_movie
         ),
-
+        MessageInput(
+            get_users_review,
+            content_types=[ContentType.TEXT],
+        ),
         state=MainMenu.leave_review
     )
 )

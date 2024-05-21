@@ -1,12 +1,14 @@
 from aiogram import F
 
 from aiogram.types import Message, CallbackQuery
+from aiogram.methods import EditMessageText
 from aiogram_dialog import Dialog, Window, DialogManager, StartMode, ShowMode
 from aiogram_dialog.widgets.kbd import Row, Button, Group, Cancel, Start
 from aiogram_i18n import I18nContext
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from keyboards.main_keyboard import main_keyboard
 from settings import settings
 
 from enums.language import Language
@@ -39,9 +41,14 @@ async def start_language(message: Message, i18n: I18nContext,
         await i18n.set_locale(language)
         logger.info("User id=%s set to default language=%s", message.from_user.id, language)
 
-    await dialog_manager.start(ChangeLanguage.change_language)
-
-    await message.delete()
+    user_start_command = message
+    greeting_message = await message.answer("Hello! I am a bot that will help you to "
+                                            "keep track of the movies you have watched. ",
+                                            )
+    await user_start_command.delete()
+    await dialog_manager.start(ChangeLanguage.change_language,
+                               show_mode=ShowMode.DELETE_AND_SEND,
+                               )
 
 
 async def language_clicked(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
@@ -50,6 +57,9 @@ async def language_clicked(callback: CallbackQuery, button: Button, dialog_manag
 
     await i18n.set_locale(language)
     logger.info("User id=%s chose language=%s", callback.from_user.id, language)
+
+    bot = dialog_manager.middleware_data.get("bot")
+
     await dialog_manager.next()
 
 
@@ -60,6 +70,7 @@ async def get_user_info(event_isolation, dialog_manager: DialogManager, *args, *
 
 
 async def on_start_workflow(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+
     await dialog_manager.start(MainMenu.show_list,
                                data={"tg_id": callback.from_user.id,
                                      }

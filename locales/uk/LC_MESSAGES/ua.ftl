@@ -79,5 +79,24 @@ leave-review =
 how-would-rate =
     Як ви оціните цей фільм?
 enter-review =
-    Залиште вашу думку про фільм або поверніться назад в головне меню
-
+    Залиште вашу думку про фільм або поверніться назад
+add-movie =
+    Додати фільм
+personal-review =
+    Ваш відгук:
+no-personal-review =
+    Ви не залишили відгук
+no-personal-rating =
+    Ви не оцінили цей фільм
+personal-rating =
+    Ваша оцінка:
+personal-overview =
+    Ваш відгук:
+error-limit =
+    Ваш відгук не може бути довшим за 200 символів
+language =
+    Змінити мову
+random =
+    Випадковий фільм
+choose-action =
+    Оберіть дію
