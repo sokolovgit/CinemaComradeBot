@@ -9,4 +9,8 @@ class MainMenu(StatesGroup):
     ask_to_leave_review = State()
     leave_rating = State()
     leave_review = State()
+    all_movies_watched = State()
+    choose_genre = State()
+    error_genre = State()
+    show_found_movies = State()
 

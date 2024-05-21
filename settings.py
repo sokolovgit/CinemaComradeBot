@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     REDIS_PORT: int
 
     PAGE_SIZE: int
+    MAX_GENRES: int
 
     model_config = SettingsConfigDict(
         env_file=('.env', 'stack.env'),

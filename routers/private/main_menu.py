@@ -1,3 +1,4 @@
+import random
 import typing
 from asyncio import sleep
 from typing import Any
@@ -5,10 +6,10 @@ from datetime import datetime
 
 import tmdbsimple as tmdb
 from aiogram.fsm.context import FSMContext
-from aiogram.methods import DeleteMessage
 from aiogram_dialog.api.entities import MediaAttachment
 from aiogram_dialog.widgets.input import MessageInput
 
+from commands import set_bot_commands
 from settings import settings
 
 from aiogram import F
@@ -33,7 +34,6 @@ from states.main_menu import MainMenu
 from enums.language import Language
 from enums.sorting import SortingType, SortingOrder
 
-from keyboards.main_keyboard import main_keyboard
 
 logger = setup_logger()
 tmdb.API_KEY = settings.TMDB_API_KEY.get_secret_value()
@@ -41,13 +41,12 @@ tmdb.API_KEY = settings.TMDB_API_KEY.get_secret_value()
 
 async def get_movies_list(event_isolation, dialog_manager: DialogManager,
                           session: AsyncSession, i18n: I18nContext, *args, **kwargs):
-    dialog_manager.dialog_data["tg_id"] = dialog_manager.middleware_data.get("event_from_user").id
     dialog_manager.dialog_data.setdefault("page_size", settings.PAGE_SIZE)
     dialog_manager.dialog_data.setdefault("current_page", 1)
     dialog_manager.dialog_data.setdefault("sorting_type", SortingType.MOVIE_RATE)
     dialog_manager.dialog_data.setdefault("sorting_order", SortingOrder.DESCENDING)
 
-    tg_id = dialog_manager.dialog_data.get("tg_id")
+    tg_id = dialog_manager.middleware_data.get("event_from_user").id
 
     db_movies = await db_get_users_movies(session, tg_id)
 
@@ -63,11 +62,9 @@ async def get_movies_list(event_isolation, dialog_manager: DialogManager,
     movies_info = await fetch_movie_details(db_movies, i18n.locale, dialog_manager, session)
     movies_on_page = await make_list(movies_info, dialog_manager, i18n)
 
-    # chatid = dialog_manager.middleware_data.get("event_chat").id
-    # print(dialog_manager.middleware_data)
-    # print(dialog_manager.middleware_data.get("event_chat").id)
-    # bot = dialog_manager.middleware_data.get("bot")
-    # await bot.send_message(text=str(chatid), chat_id=chatid, reply_markup=main_keyboard(i18n))
+    # genres = tmdb.Genres().movie_list()
+    # for genre in genres:
+    #     print(genre["name"])
 
     return {
         "is_empty": is_empty,
@@ -87,7 +84,7 @@ async def sort_movies(movies, dialog_manager: DialogManager):
 
     if sorting_type == SortingType.MOVIE_RATE:
         sort_key = lambda movie: movie['vote_average']
-    elif sorting_type == SortingType.LIKED_TIME:  # Assuming this is the constant for sorting by date
+    elif sorting_type == SortingType.LIKED_TIME:
         sort_key = lambda movie: movie['added_at']
 
     if sorting_order == SortingOrder.DESCENDING:
@@ -101,7 +98,7 @@ async def fetch_movie_details(db_movies, language, dialog_manager: DialogManager
     for movie in db_movies:
         movie_id = movie.tmdb_id
         movie_info = tmdb.Movies(id=movie_id).info(language=language)
-        added_at = await db_get_movie_added_time(session, dialog_manager.dialog_data.get("tg_id"), movie_id)
+        added_at = await db_get_movie_added_time(session, dialog_manager.middleware_data.get("event_from_user").id, movie_id)
         movie_info['added_at'] = added_at
         movies_info.append(movie_info)
 
@@ -142,7 +139,6 @@ async def on_arrow_right(callback: CallbackQuery, button: Button, dialog_manager
     data = dialog_manager.dialog_data
     current_page, pages_num = data.get("current_page"), data.get("pages_num")
 
-    # If current page is the last page, go to the first page
     data["current_page"] = 1 if current_page == pages_num else current_page + 1
 
 
@@ -177,6 +173,8 @@ async def on_language_selected(callback: CallbackQuery, widget: Any,
 
     await i18n.set_locale(language)
     logger.info("User id=%s chose language=%s", callback.from_user.id, language)
+    await set_bot_commands(callback.bot, i18n)
+
     await dialog_manager.start(MainMenu.show_list,
                                mode=StartMode.RESET_STACK,
                                show_mode=ShowMode.EDIT,
@@ -221,8 +219,7 @@ async def get_add_movies_list(event_isolation, dialog_manager: DialogManager, i1
     current_page = dialog_manager.dialog_data["current_page"]
 
     start = (current_page - 1) * page_size
-    end = start + page_size
-    end = min(end, movies_num)  # Ensure 'end' does not exceed the length of the movies list
+    end = min((start + page_size), movies_num)
 
     movies = movies[start:end]
 
@@ -256,15 +253,12 @@ async def on_movie_to_add(callback: CallbackQuery, widget: Any, dialog_manager: 
     session: AsyncSession = dialog_manager.middleware_data.get("session")
     tmdb_id = int(item_id)
 
-    # Fetch movie details
     movie = tmdb.Movies(id=tmdb_id)
     movie_info = movie.info()
 
-    # Create a dictionary with the movie data
     movie_data = {
         'tmdb_id': movie_info['id'],
         'movie_name': movie_info['title'],
-        # Add other attributes here if needed
     }
 
     await db_add_movie_to_user(session, tg_id, movie_data)
@@ -296,7 +290,7 @@ async def on_delete(callback: CallbackQuery, button: Button, dialog_manager: Dia
     await dialog_manager.start(MainMenu.show_list,
                                mode=StartMode.RESET_STACK,
                                show_mode=ShowMode.EDIT,
-                               data={"tg_id": tg_id})
+                               )
 
 
 async def on_state_changed(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
@@ -316,14 +310,14 @@ async def on_state_changed(callback: CallbackQuery, button: Button, dialog_manag
         await dialog_manager.start(MainMenu.show_details,
                                    mode=StartMode.RESET_STACK,
                                    show_mode=ShowMode.EDIT,
-                                   data={"movie_id": movie_id,
-                                         "tg_id": tg_id})
+                                   data={"movie_id": movie_id}
+                                   )
 
 
 async def get_movie_details(event_isolation, dialog_manager: DialogManager, session: AsyncSession, i18n: I18nContext,
                             *args, **kwargs):
     movie_id = dialog_manager.start_data["movie_id"]
-    tg_id = dialog_manager.middleware_data.get("event_from_user").id
+    tg_id = dialog_manager.start_data["tg_id"]
     movie = tmdb.Movies(id=movie_id).info(language=i18n.locale)
 
     users_movie_info = await db_get_users_movie_data(session, tg_id, movie_id)
@@ -374,7 +368,8 @@ async def get_movie_details(event_isolation, dialog_manager: DialogManager, sess
         "is_poster": is_poster,
         "poster": MediaAttachment(ContentType.PHOTO,
                                   url=poster_url),
-        "is_watched": users_movie_info["is_watched"]
+        "is_watched": users_movie_info["is_watched"],
+        "in_database": users_movie_info["in_database"]
     }
 
 
@@ -438,6 +433,127 @@ async def movie_name_input(message: Message, message_input: MessageInput, dialog
     await message.delete()
 
 
+async def show_random_movie(message: Message, dialog_manager: DialogManager):
+    await message.delete()
+
+    session = dialog_manager.middleware_data.get("session")
+    tg_id = message.from_user.id
+    db_movies = await db_get_users_movies(session, tg_id)
+
+    unwatched_movies = []
+    for movie in db_movies:
+        is_watched = await db_get_movie_state_for_user(session, tg_id, movie.tmdb_id)
+        if not is_watched:
+            unwatched_movies.append(movie)
+
+    if not unwatched_movies:
+        await dialog_manager.start(MainMenu.all_movies_watched, show_mode=ShowMode.EDIT)
+        return
+
+    random_movie = random.choice(unwatched_movies)
+
+    await dialog_manager.start(MainMenu.show_details,
+                               mode=StartMode.RESET_STACK,
+                               show_mode=ShowMode.EDIT,
+                               data={"movie_id": random_movie.tmdb_id,
+                                     "tg_id": tg_id}
+                               )
+
+
+async def genres_command(message: Message, dialog_manager: DialogManager):
+    await message.delete()
+    await dialog_manager.start(MainMenu.choose_genre, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT)
+
+
+async def on_genre_selected(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
+    selected_genres = dialog_manager.dialog_data.get("selected_genres", [])
+    i18n = dialog_manager.middleware_data.get("i18n")
+
+    if item_id in selected_genres:
+        selected_genres.remove(item_id)
+        dialog_manager.dialog_data["selected_genres"] = selected_genres
+        return
+
+    elif len(selected_genres) >= settings.MAX_GENRES:
+        message = await callback.bot.send_message(chat_id=callback.message.chat.id,
+                                                  text=i18n.get("error-genres"))
+        await sleep(5)
+        await message.delete()
+        return
+
+    selected_genres.append(item_id)
+    dialog_manager.dialog_data["selected_genres"] = selected_genres
+
+
+async def get_genres_list(event_isolation, dialog_manager: DialogManager, i18n: I18nContext, *args, **kwargs):
+    tmdb_genres = tmdb.Genres().movie_list(language=i18n.locale)['genres']
+    genres = []
+    selected_genres = dialog_manager.dialog_data.get("selected_genres", [])
+
+    for genre in tmdb_genres:
+        name = genre["name"]
+        if str(genre["id"]) in selected_genres:
+            name += " ✅"
+
+        genres.append((genre["id"], name))
+
+    return {
+        "genres1": genres[:4],
+        "genres2": genres[4:8],
+        "genres3": genres[8:12],
+        "genres4": genres[12:16],
+        "genres5": genres[16:],
+    }
+
+
+async def on_find_movies(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    await dialog_manager.next()
+
+
+async def get_found_movies(event_isolation, dialog_manager: DialogManager, i18n: I18nContext, *args, **kwargs):
+    dialog_manager.dialog_data.setdefault("page_size", settings.PAGE_SIZE)
+    dialog_manager.dialog_data.setdefault("current_page", 1)
+
+    genres = dialog_manager.dialog_data.get("selected_genres", [])
+
+    response = tmdb.Discover().movie(with_genres=genres, language=i18n.locale)
+    movies = []
+
+    for movie in response['results']:
+        movie_str = f"{movie['title']} {movie['vote_average']}"
+        movies.append((movie_str, movie['id']))
+
+    movies_num = len(movies)
+    page_size = dialog_manager.dialog_data["page_size"]
+    dialog_manager.dialog_data[
+        "pages_num"] = movies_num // page_size if movies_num % page_size == 0 else movies_num // page_size + 1
+
+    current_page = dialog_manager.dialog_data["current_page"]
+
+    start = (current_page - 1) * page_size
+    end = min((start + page_size), movies_num)
+
+    movies = movies[start:end]
+
+    return {
+        "movies": movies,
+        "current_page": dialog_manager.dialog_data.get("current_page"),
+        "pages_num": dialog_manager.dialog_data.get("pages_num"),
+        "is_empty": movies_num == 0
+    }
+
+
+async def on_found_movie(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
+    await dialog_manager.start(MainMenu.show_details,
+                               mode=StartMode.RESET_STACK,
+                               show_mode=ShowMode.EDIT,
+                               data={"movie_id": item_id,
+                                     "tg_id": callback.from_user.id}
+                               )
+
+
+async def on_back_to_genres(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    await dialog_manager.start(MainMenu.choose_genre, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT)
 
 
 main_menu = Dialog(
@@ -563,7 +679,8 @@ main_menu = Dialog(
         Button(
             I18NFormat("delete-movie"),
             id="delete_movie",
-            on_click=on_delete
+            on_click=on_delete,
+            when=F["in_database"]
         ),
         Button(
             I18NFormat("go-back"),
@@ -578,8 +695,8 @@ main_menu = Dialog(
                            when=~F["is_watched"]),
             ),
             id="is_watched",
-            on_click=on_state_changed
-
+            on_click=on_state_changed,
+            when=F["in_database"]
         ),
         DynamicMedia("poster",
                      when=F["is_poster"]),
@@ -641,5 +758,115 @@ main_menu = Dialog(
             content_types=[ContentType.TEXT],
         ),
         state=MainMenu.leave_review
-    )
+    ),
+    # you have watched all movies window
+    Window(
+        I18NFormat("all-movies-watched-error"),
+        Button(
+            I18NFormat("go-back"),
+            id="go_back",
+            on_click=on_back
+        ),
+        state=MainMenu.all_movies_watched
+    ),
+    # window for choosing genre for reccomendation movie
+    Window(
+        I18NFormat("choose-genre"),
+        Row(
+            Select(
+                Format("{item[1]}"),
+                id="genre",
+                item_id_getter=lambda item: item[0],
+                items="genres1",
+                on_click=on_genre_selected
+            ),
+        ),
+        Row(
+            Select(
+                Format("{item[1]}"),
+                id="genre",
+                item_id_getter=lambda item: item[0],
+                items="genres2",
+                on_click=on_genre_selected
+            ),
+        ),
+        Row(
+            Select(
+                Format("{item[1]}"),
+                id="genre",
+                item_id_getter=lambda item: item[0],
+                items="genres3",
+                on_click=on_genre_selected
+            ),
+        ),
+        Row(
+            Select(
+                Format("{item[1]}"),
+                id="genre",
+                item_id_getter=lambda item: item[0],
+                items="genres4",
+                on_click=on_genre_selected
+            ),
+        ),
+        Row(
+            Select(
+                Format("{item[1]}"),
+                id="genre",
+                item_id_getter=lambda item: item[0],
+                items="genres5",
+                on_click=on_genre_selected
+            ),
+        ),
+        Button(
+            I18NFormat("show-movies-with-genres"),
+            id="movies_with_genres",
+            on_click=on_find_movies,
+        ),
+        Button(
+            I18NFormat("go-back"),
+            id="go_back",
+            on_click=on_back
+        ),
+        state=MainMenu.choose_genre,
+        getter=get_genres_list
+    ),
+    # found movies window
+    Window(
+        I18NFormat("found-movies", when=~F["is_empty"]),
+        I18NFormat("no-found-movies", when=F["is_empty"]),
+        Column(
+            Select(
+                Format("{item[0]}"),
+                id="s_found_movie",
+                item_id_getter=lambda item: item[1],
+                items="movies",
+                on_click=on_found_movie,
+            ),
+            when=~F["is_empty"]
+        ),
+        Row(
+            Button(
+                I18NFormat("arrow-left"),
+                id="arrow_left",
+                on_click=on_arrow_left
+            ),
+            Button(
+                Format("{current_page} / {pages_num}"),
+                id="page"
+            ),
+            Button(
+                I18NFormat("arrow-right"),
+                id="arrow_right",
+                on_click=on_arrow_right
+            ),
+            when=~F["is_empty"]
+        ),
+        Button(
+            I18NFormat("go-back"),
+            id="go_back_genres",
+            on_click=on_back_to_genres
+        ),
+        state=MainMenu.show_found_movies,
+        getter=get_found_movies
+    ),
 )

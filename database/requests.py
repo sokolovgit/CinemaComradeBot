@@ -136,12 +136,16 @@ async def db_get_users_movie_data(session: AsyncSession, tg_id: int, movie_id: i
 
     if user_movie_data is None:
         logger.info("No user movie data found for tg_id=%s and movie_id=%s", tg_id, movie_id)
-        return None
+        return {
+            "is_watched": False,
+            "in_database": False
+        }
 
     data = {
         "is_watched": user_movie_data[0],
         "personal_rating": user_movie_data[1],
         "personal_review": user_movie_data[2],
+        "in_database": True
     }
 
     logger.info(f"User movie data: {data}")

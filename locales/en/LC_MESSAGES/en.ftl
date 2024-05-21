@@ -94,9 +94,30 @@ personal-overview =
     Your review:
 error-limit =
     Your review is too long. Please limit it to 200 characters.
+error-genres =
+    You can't choose more than 5 genres!
 language =
     🌐 Change language
 random =
     Get random movie
 choose-action =
     Choose action
+all-movies-watched-error =
+    Oops! It looks like you have already watched all the movies. Press the button below to return
+command-language =
+    Change bot language
+command-random =
+    Get random unwatched movie from liked
+greeting-message =
+    Hello! I am your cinema comreade and will help you keep track of the movies you have watched and want to watch. Let's get started! 🎬
+    #here goes the list of commands
+choose-genre =
+    For which genre or genres would you like to see the list of movies?
+command-movies-on-genre =
+    Get movies by genre or genres
+show-movies-with-genres =
+    Find movies!
+found-movies =
+    Here is the list of movies that match your chosen genres
+no-found-movies =
+    Oops! We didn't find movies that match your criterias

@@ -18,6 +18,7 @@ from states.main_menu import MainMenu
 from utils.i18n_format import I18NFormat
 from utils.logger import setup_logger
 from database.requests import db_add_user
+from commands import set_bot_commands
 
 
 logger = setup_logger()
@@ -41,13 +42,12 @@ async def start_language(message: Message, i18n: I18nContext,
         await i18n.set_locale(language)
         logger.info("User id=%s set to default language=%s", message.from_user.id, language)
 
-    user_start_command = message
-    greeting_message = await message.answer("Hello! I am a bot that will help you to "
-                                            "keep track of the movies you have watched. ",
-                                            )
-    await user_start_command.delete()
+    greetings = await message.answer(i18n.get("greeting-message"))
+
+    await message.delete()
     await dialog_manager.start(ChangeLanguage.change_language,
-                               show_mode=ShowMode.DELETE_AND_SEND,
+                               show_mode=ShowMode.SEND,
+                               data={"msg_id": greetings.message_id,}
                                )
 
 
@@ -58,15 +58,11 @@ async def language_clicked(callback: CallbackQuery, button: Button, dialog_manag
     await i18n.set_locale(language)
     logger.info("User id=%s chose language=%s", callback.from_user.id, language)
 
-    bot = dialog_manager.middleware_data.get("bot")
-
-    await dialog_manager.next()
-
-
-async def get_user_info(event_isolation, dialog_manager: DialogManager, *args, **kwargs):
-    return {
-        "tg_id": dialog_manager.dialog_data.get("tg_id"),
-    }
+    await set_bot_commands(callback.bot, i18n)
+    await callback.bot.edit_message_text(i18n.get("greeting-message"),
+                                         chat_id=callback.message.chat.id,
+                                         message_id=dialog_manager.start_data["msg_id"])
+    await dialog_manager.start(ChangeLanguage.language_changed, show_mode=ShowMode.DELETE_AND_SEND)
 
 
 async def on_start_workflow(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
@@ -99,8 +95,9 @@ start = Dialog(
             on_click=on_start_workflow
         ),
         state=ChangeLanguage.language_changed,
-        ),
+    )
 )
+
 
 
 
