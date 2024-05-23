@@ -51,6 +51,9 @@ async def main():
               default=DefaultBotProperties(parse_mode=ParseMode.HTML)
               )
 
+    await bot.delete_webhook()
+
+
     dp = Dispatcher(storage=storage, event_isolation=events_isolation)
 
     setup_dialogs(dp)
@@ -68,7 +71,7 @@ async def main():
 
     dp.include_router(router)
 
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, drop_pending_updates=True)
 
 
 if __name__ == '__main__':
@@ -77,37 +80,3 @@ if __name__ == '__main__':
         asyncio.run(main())
     except KeyboardInterrupt or SystemExit:
         print('Exit')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# import tmdbsimple as tmdb
-#
-# tmdb.API_KEY = 'e8aed00ef863e2222c14a8009d6272a6'
-#
-# search = tmdb.Search()
-#
-# response = search.movie(query='Матриця', language='uk-UA')
-#
-#
-# for movie in response['results']:
-#     print(movie['title'], movie['id'])
-#
-# movie = tmdb.Movies(id=603)
-# movie_info = movie.info(language='uk-UA')
-#
-# print(movie_info['title'], movie_info['overview'], movie_info['release_date'])
-#
-#
-#

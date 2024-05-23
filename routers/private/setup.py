@@ -31,11 +31,8 @@ async def start_language(message: Message, i18n: I18nContext,
         "tg_id": tg_id,
         "user_name": f"{message.from_user.first_name} {message.from_user.last_name}",
     }
+    await db_add_user(session, data)
 
-    try:
-        await db_add_user(session, data)
-    except Exception as e:
-        print(f"Error = {e}.")
 
     if message.from_user.language_code in Language.__members__.values():
         language = message.from_user.language_code
@@ -59,9 +56,12 @@ async def language_clicked(callback: CallbackQuery, button: Button, dialog_manag
     logger.info("User id=%s chose language=%s", callback.from_user.id, language)
 
     await set_bot_commands(callback.bot, i18n)
-    await callback.bot.edit_message_text(i18n.get("greeting-message"),
-                                         chat_id=callback.message.chat.id,
-                                         message_id=dialog_manager.start_data["msg_id"])
+
+    if language != callback.from_user.language_code:
+        await callback.bot.edit_message_text(i18n.get("greeting-message"),
+                                             chat_id=callback.message.chat.id,
+                                             message_id=dialog_manager.start_data["msg_id"])
+
     await dialog_manager.start(ChangeLanguage.language_changed, show_mode=ShowMode.DELETE_AND_SEND)
 
 

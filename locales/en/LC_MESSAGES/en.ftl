@@ -121,3 +121,5 @@ found-movies =
     Here is the list of movies that match your chosen genres
 no-found-movies =
     Oops! We didn't find movies that match your criterias
+add-movie =
+    Add movie

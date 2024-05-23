@@ -1,6 +1,7 @@
 import random
 import typing
 from asyncio import sleep
+from math import floor
 from typing import Any
 from datetime import datetime
 
@@ -12,17 +13,17 @@ from aiogram_dialog.widgets.input import MessageInput
 from commands import set_bot_commands
 from settings import settings
 
-from aiogram import F
+from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message, ContentType
 from aiogram_dialog import DialogManager, Dialog, Window, StartMode, ShowMode
-from aiogram_dialog.widgets.text import Format, Multi, List, Const
-from aiogram_dialog.widgets.kbd import Row, Button, Select, Column, Checkbox, ManagedCheckbox
+from aiogram_dialog.widgets.text import Format, Multi
+from aiogram_dialog.widgets.kbd import Row, Button, Select, Column
 from aiogram_dialog.widgets.media import DynamicMedia
 from aiogram_i18n import I18nContext
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.requests import db_get_users_movies, db_get_all_movies, db_add_movie_to_user, db_get_movie_added_time, \
+from database.requests import db_get_users_movies, db_add_movie_to_user, db_get_movie_added_time, \
     db_delete_movie_from_user, db_get_users_movie_data, db_change_movie_state, db_get_movie_state_for_user, \
     db_leave_review
 
@@ -61,10 +62,6 @@ async def get_movies_list(event_isolation, dialog_manager: DialogManager,
 
     movies_info = await fetch_movie_details(db_movies, i18n.locale, dialog_manager, session)
     movies_on_page = await make_list(movies_info, dialog_manager, i18n)
-
-    # genres = tmdb.Genres().movie_list()
-    # for genre in genres:
-    #     print(genre["name"])
 
     return {
         "is_empty": is_empty,
@@ -117,13 +114,12 @@ async def make_list(movies_info: typing.List[dict], dialog_manager: DialogManage
     end = start + page_size
 
     movie_list = []
-    index = 1
     for i in range(start, min(end, movies_num)):
         movie = movies_info[i]
 
         movie_str = f"{i + 1}. {movie['title']} {movie['vote_average']}"
         movie_list.append((movie_str, movie['id']))
-        index += 1
+
 
     return movie_list
 
@@ -209,8 +205,9 @@ async def get_add_movies_list(event_isolation, dialog_manager: DialogManager, i1
     movies = []
 
     for movie in response['results']:
-        movie_str = f"{movie['title']} {movie['vote_average']}"
-        movies.append((movie_str, movie['id']))
+        if movie['vote_average'] > 0:
+            movie_str = f"{movie['title']} {movie['release_date'][0:4]}, {int(movie['vote_average'])} ⭐️"
+            movies.append((movie_str, movie['id']))
 
     movies_num = len(movies)
     page_size = dialog_manager.dialog_data["page_size"]
@@ -249,35 +246,21 @@ async def on_back_to_movie(callback: CallbackQuery, button: Button, dialog_manag
 
 
 async def on_movie_to_add(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
-    tg_id: int = callback.from_user.id
-    session: AsyncSession = dialog_manager.middleware_data.get("session")
-    tmdb_id = int(item_id)
-
-    movie = tmdb.Movies(id=tmdb_id)
-    movie_info = movie.info()
-
-    movie_data = {
-        'tmdb_id': movie_info['id'],
-        'movie_name': movie_info['title'],
-    }
-
-    await db_add_movie_to_user(session, tg_id, movie_data)
-
-    await dialog_manager.start(MainMenu.show_list,
+    await dialog_manager.start(MainMenu.show_details,
                                mode=StartMode.RESET_STACK,
                                show_mode=ShowMode.EDIT,
-                               data={"tg_id": callback.from_user.id})
+                               data={"movie_id": item_id,
+                                     "tg_id": callback.from_user.id}
+                               )
 
 
 async def on_movie_details(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
-
-    await dialog_manager.start(
-        MainMenu.show_details,
-        mode=StartMode.RESET_STACK,
-        show_mode=ShowMode.EDIT,
-        data={"movie_id": item_id,
-              "tg_id": callback.from_user.id}
-    )
+    await dialog_manager.start(MainMenu.show_details,
+                               mode=StartMode.RESET_STACK,
+                               show_mode=ShowMode.EDIT,
+                               data={"movie_id": item_id,
+                                     "tg_id": callback.from_user.id}
+                               )
 
 
 async def on_delete(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
@@ -317,7 +300,7 @@ async def on_state_changed(callback: CallbackQuery, button: Button, dialog_manag
 async def get_movie_details(event_isolation, dialog_manager: DialogManager, session: AsyncSession, i18n: I18nContext,
                             *args, **kwargs):
     movie_id = dialog_manager.start_data["movie_id"]
-    tg_id = dialog_manager.start_data["tg_id"]
+    tg_id = dialog_manager.middleware_data.get("event_from_user").id
     movie = tmdb.Movies(id=movie_id).info(language=i18n.locale)
 
     users_movie_info = await db_get_users_movie_data(session, tg_id, movie_id)
@@ -514,14 +497,19 @@ async def get_found_movies(event_isolation, dialog_manager: DialogManager, i18n:
     dialog_manager.dialog_data.setdefault("page_size", settings.PAGE_SIZE)
     dialog_manager.dialog_data.setdefault("current_page", 1)
 
-    genres = dialog_manager.dialog_data.get("selected_genres", [])
-
-    response = tmdb.Discover().movie(with_genres=genres, language=i18n.locale)
+    genres = ','.join(dialog_manager.dialog_data.get("selected_genres", []))
     movies = []
 
-    for movie in response['results']:
-        movie_str = f"{movie['title']} {movie['vote_average']}"
-        movies.append((movie_str, movie['id']))
+    for page in range(1, 3):
+        response: dict = tmdb.Discover().movie(with_genres=genres,
+                                               language=i18n.locale,
+                                               sort_by="vote_average.desc",
+                                               vote_count_gte=100,
+                                               page=page)
+
+        for movie in response['results']:
+            movie_str = f"{movie['title']} {movie['release_date'][0:4]}, {int(movie['vote_average'])} ⭐️"
+            movies.append((movie_str, movie['id']))
 
     movies_num = len(movies)
     page_size = dialog_manager.dialog_data["page_size"]
@@ -554,6 +542,21 @@ async def on_found_movie(callback: CallbackQuery, widget: Any, dialog_manager: D
 
 async def on_back_to_genres(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
     await dialog_manager.start(MainMenu.choose_genre, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT)
+
+
+async def on_found_movie_to_add(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    tg_id = callback.from_user.id
+    session = dialog_manager.middleware_data.get("session")
+    tmdb_id = int(dialog_manager.start_data["movie_id"])
+
+    movie = tmdb.Movies(id=tmdb_id).info()
+
+    movie_data = {
+        'tmdb_id': movie['id'],
+        'movie_name': movie['title'],
+    }
+
+    await db_add_movie_to_user(session, tg_id, movie_data)
 
 
 main_menu = Dialog(
@@ -686,6 +689,12 @@ main_menu = Dialog(
             I18NFormat("go-back"),
             id="go_back",
             on_click=on_back
+        ),
+        Button(
+            I18NFormat("add-movie"),
+            id="add_found_movie",
+            on_click=on_found_movie_to_add,
+            when=~F["in_database"]
         ),
         Button(
             Multi(
