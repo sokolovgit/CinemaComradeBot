@@ -69,7 +69,8 @@ async def on_start_workflow(callback: CallbackQuery, button: Button, dialog_mana
 
     await dialog_manager.start(MainMenu.show_list,
                                data={"tg_id": callback.from_user.id,
-                                     }
+                                     },
+                               show_mode=ShowMode.EDIT
                                )
 
 
