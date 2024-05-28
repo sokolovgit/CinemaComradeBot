@@ -1,23 +1,23 @@
 hello-world =
     Hello world!
 choose-language =
-    Please, choose language you want to use:
-en = English
-uk = Українська
+    Please, choose language you want to use 🌐
+en = English 🇬🇧
+uk = Українська 🇺🇦
 yes = Yes
 no = No
 -en = English
 -uk = Українська
 chosen-language =
-    You have chosen English language. All messages will be displayed in English
+    You have chosen English language. All messages will be displayed in English 🇬🇧
 get-started =
-    Get started!
+    Get started! 🚀
 no-movies =
-    Oops! It looks like you haven't added any movies yet. Let's add some! Just type the name of the movie you want to add.
+    Oops! 😓 It looks like you haven't added any movies yet. Let's add some! Just type the name of the movie you want to add ✍️
 show-movies =
-    To add the movie to the list, type the name of the movie you want to add.
+    To add the movie to the list, type the name of the movie you want to add ✍️
 
-    To see the description of the movie, just click on the movie title.
+    To see the description of the movie, just click on the movie title 🎬
 
     Here is the list of all movies you have added ⬇️
 get-description =
@@ -31,17 +31,17 @@ arrow-left =
 arrow-right =
     →
 sorting-rate =
-    Sort by: rating
+    Sort by: rating ☆
 sorting-date =
-    Sort by: date added
+    Sort by: date added ⏲
 order-asc =
-    Order: ascending
+    ↕ Order: ascending
 order-desc =
-    Order: descending
+    ↕ Order: descending
 last-added =
-    Order: last added
+    ↕ Order: last added
 first-added =
-    Order: first added
+    ↕ Order: first added
 choose-movie-to-add =
     Choose the movie you want to add to the list:
 go-back =
@@ -69,19 +69,19 @@ rating =
 is_adult =
     Content rating is 18+ 🔞
 delete-movie =
-    Delete movie
+    Delete movie 🗑
 movie-is-watched =
     Movie is watched: ✅
 movie-not-watched =
     Movie is watched: ❌
 leave-review =
-    Would you like to leave a review?
+    Would you like to leave a review? 📝
 how-would-rate =
-    How would you rate this movie?
+    How would you rate this movie? 🌟
 enter-review =
-    Send your opinion about the movie or return
+    Send your opinion about the movie or return 🫣
 add-movie =
-    Add movie
+    Add movie! 🎬
 personal-review =
     Personal review:
 no-personal-review =
@@ -93,33 +93,37 @@ personal-rating =
 personal-overview =
     Your review:
 error-limit =
-    Your review is too long. Please limit it to 200 characters.
+    Your review is too long 🙁. Please limit it to 200 characters 😶
 error-genres =
-    You can't choose more than 5 genres!
+    You can't choose more than 5 genres! 🥺
 language =
-    🌐 Change language
+    Change language 🌐
 random =
-    Get random movie
+    Get random movie 🎲
 choose-action =
-    Choose action
+    Choose action 🍿
 all-movies-watched-error =
-    Oops! It looks like you have already watched all the movies. Press the button below to return
+    Oops! 😓 It looks like you have already watched all the movies 😭. Press the button below to return 😌
 command-language =
-    Change bot language
+    Change bot language 🌐
 command-random =
-    Get random unwatched movie from liked
+    Get random unwatched movie from liked 🎲
 greeting-message =
-    Hello! I am your cinema comreade and will help you keep track of the movies you have watched and want to watch. Let's get started! 🎬
-    #here goes the list of commands
+    Hello! I am your cinema comrade and will help you to keep track of the movies you have watched and want to watch. Let's get started! 🎬
+
+    /start - start command 🏁
+    /random - get random unwatched movie from your list 🍿
+    /movies_on_genre - get movies by genre or genres 📼
+
 choose-genre =
-    For which genre or genres would you like to see the list of movies?
+    For which genres would you like to see the list of movies? 😌
 command-movies-on-genre =
-    Get movies by genre or genres
+    Get movies by genres 🎥
 show-movies-with-genres =
-    Find movies!
+    Find movies! 🎰
 found-movies =
-    Here is the list of movies that match your chosen genres
+    Here is the list of movies that match your chosen genres ⬇️
 no-found-movies =
-    Oops! We didn't find movies that match your criterias
+    Oops! We didn't find movies that match your criterias 😓
 add-movie =
-    Add movie
+    Add movie 🎬

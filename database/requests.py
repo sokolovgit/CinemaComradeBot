@@ -13,6 +13,12 @@ logger = setup_logger()
 
 
 async def db_add_user(session: AsyncSession, data: dict):
+    """
+    Asynchronously add a new user to the database.
+
+    :param session: AsyncSession instance.
+    :param data: Dictionary containing user data.
+    """
     existing_user = await session.execute(select(User).where(User.tg_id == data["tg_id"]))
     user_in_db = existing_user.scalars().first()
 
@@ -31,11 +37,24 @@ async def db_add_user(session: AsyncSession, data: dict):
 
 
 async def db_get_all_movies(session: AsyncSession):
+    """
+    Asynchronously get all movies from the database.
+
+    :param session: AsyncSession instance.
+    :return: List of all movies.
+    """
     movies = await session.execute(select(Movie))
     return movies.scalars().all()
 
 
 async def db_get_users_movies(session: AsyncSession, tg_id: int):
+    """
+    Asynchronously get all movies associated with a user.
+
+    :param session: AsyncSession instance.
+    :param tg_id: Telegram ID of the user.
+    :return: List of movies associated with the user.
+    """
     user = await session.execute(select(User).where(User.tg_id == tg_id))
     user_in_db = user.scalars().first()
 
@@ -52,7 +71,13 @@ async def db_get_users_movies(session: AsyncSession, tg_id: int):
 
 
 async def db_add_movie_to_user(session: AsyncSession, tg_id: int, data: dict):
-    # Query the user by tg_id
+    """
+    Asynchronously add a movie to a user's list.
+
+    :param session: AsyncSession instance.
+    :param tg_id: Telegram ID of the user.
+    :param data: Dictionary containing movie data.
+    """
     user = await session.execute(select(User).where(User.tg_id == tg_id))
     user_in_db = user.scalars().first()
 
@@ -62,7 +87,6 @@ async def db_add_movie_to_user(session: AsyncSession, tg_id: int, data: dict):
 
     logger.info("User tg_id=%s found in the database", tg_id)
 
-    # Query the movie by tmdb_id
     movie = await session.execute(select(Movie).where(Movie.tmdb_id == data['tmdb_id']))
     movie_in_db = movie.scalars().first()
 
@@ -71,7 +95,6 @@ async def db_add_movie_to_user(session: AsyncSession, tg_id: int, data: dict):
 
     logger.info("Movie tmdb_id=%s found in the database", data['tmdb_id'])
 
-    # Check if movie already added to user
     user_movie = await session.execute(select(user_movie_association).
                                        where(user_movie_association.c.user_tg_id == tg_id,
                                              user_movie_association.c.movie_tmdb_id == data['tmdb_id']))
@@ -90,7 +113,12 @@ async def db_add_movie_to_user(session: AsyncSession, tg_id: int, data: dict):
 
 
 async def db_add_movie(session: AsyncSession, data: dict):
-    # Check if the movie already exists in the database
+    """
+    Asynchronously add a new movie to the database.
+
+    :param session: AsyncSession instance.
+    :param data: Dictionary containing movie data.
+    """
     existing_movie = await session.execute(select(Movie).where(Movie.tmdb_id == data['tmdb_id']))
     movie_in_db = existing_movie.scalars().first()
 
@@ -98,7 +126,6 @@ async def db_add_movie(session: AsyncSession, data: dict):
         logger.info("Movie tmdb_id=%s already exists in the database", data['tmdb_id'])
         return
 
-    # Movie does not exist, create and add it to the database
     new_movie = Movie(tmdb_id=data['tmdb_id'], movie_name=data['movie_name'])
     session.add(new_movie)
     await session.commit()
@@ -106,6 +133,14 @@ async def db_add_movie(session: AsyncSession, data: dict):
 
 
 async def db_get_movie_added_time(session: AsyncSession, tg_id: int, movie_id: int):
+    """
+    Asynchronously get the time when a movie was added to a user's list.
+
+    :param session: AsyncSession instance.
+    :param tg_id: Telegram ID of the user.
+    :param movie_id: TMDB ID of the movie.
+    :return: Time when the movie was added.
+    """
     stmt = select(user_movie_association.c.added_at).where(user_movie_association.c.user_tg_id == tg_id,
                                                            user_movie_association.c.movie_tmdb_id == movie_id)
     result = await session.execute(stmt)
@@ -113,6 +148,13 @@ async def db_get_movie_added_time(session: AsyncSession, tg_id: int, movie_id: i
 
 
 async def db_delete_movie_from_user(session, tg_id, movie_id):
+    """
+    Asynchronously delete a movie from a user's list.
+
+    :param session: AsyncSession instance.
+    :param tg_id: Telegram ID of the user.
+    :param movie_id: TMDB ID of the movie.
+    """
     await session.execute(user_movie_association.delete().where(user_movie_association.c.user_tg_id == tg_id,
                                                                 user_movie_association.c.movie_tmdb_id == movie_id))
     await session.commit()
@@ -120,6 +162,14 @@ async def db_delete_movie_from_user(session, tg_id, movie_id):
 
 
 async def db_get_users_movie_data(session: AsyncSession, tg_id: int, movie_id: int):
+    """
+       Asynchronously get a user's data for a specific movie.
+
+       :param session: AsyncSession instance.
+       :param tg_id: Telegram ID of the user.
+       :param movie_id: TMDB ID of the movie.
+       :return: Dictionary containing user's data for the movie.
+       """
     stmt = (
         select(
             user_movie_association.c.is_watched,
@@ -154,6 +204,14 @@ async def db_get_users_movie_data(session: AsyncSession, tg_id: int, movie_id: i
 
 
 async def db_change_movie_state(session: AsyncSession, tg_id: int, movie_id: int, state: bool):
+    """
+    Asynchronously change the watched state of a movie for a user.
+
+    :param session: AsyncSession instance.
+    :param tg_id: Telegram ID of the user.
+    :param movie_id: TMDB ID of the movie.
+    :param state: Current watched state of the movie.
+    """
     new_state = not state
 
     await session.execute(user_movie_association.update().
@@ -170,6 +228,15 @@ async def db_change_movie_state(session: AsyncSession, tg_id: int, movie_id: int
 
 
 async def db_get_movie_state_for_user(session: AsyncSession, tg_id: int, movie_id: int):
+
+    """
+   Asynchronously get the watched state of a movie for a user.
+
+   :param session: AsyncSession instance.
+   :param tg_id: Telegram ID of the user.
+   :param movie_id: TMDB ID of the movie.
+   :return: Watched state of the movie for the user.
+   """
     stmt = select(user_movie_association.c.is_watched).where(user_movie_association.c.user_tg_id == tg_id,
                                                              user_movie_association.c.movie_tmdb_id == movie_id)
     result = await session.execute(stmt)
@@ -177,6 +244,14 @@ async def db_get_movie_state_for_user(session: AsyncSession, tg_id: int, movie_i
 
 
 async def db_leave_review(session: AsyncSession, tg_id: int, movie_id: int, data: dict):
+    """
+   Asynchronously leave a review for a movie.
+
+   :param session: AsyncSession instance.
+   :param tg_id: Telegram ID of the user.
+   :param movie_id: TMDB ID of the movie.
+   :param data: Dictionary containing review data.
+   """
     await session.execute(user_movie_association.update().
                           where(user_movie_association.c.user_tg_id == tg_id,
                                 user_movie_association.c.movie_tmdb_id == movie_id).
@@ -187,6 +262,13 @@ async def db_leave_review(session: AsyncSession, tg_id: int, movie_id: int, data
 
 
 async def db_remove_personal_data(session: AsyncSession, tg_id: int, movie_id: int):
+    """
+   Asynchronously remove personal data for a movie from a user's list.
+
+   :param session: AsyncSession instance.
+   :param tg_id: Telegram ID of the user.
+   :param movie_id: TMDB ID of the movie.
+   """
     await session.execute(user_movie_association.update().
                           where(user_movie_association.c.user_tg_id == tg_id,
                                 user_movie_association.c.movie_tmdb_id == movie_id).

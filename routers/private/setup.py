@@ -8,7 +8,7 @@ from aiogram_i18n import I18nContext
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from keyboards.main_keyboard import main_keyboard
+
 from settings import settings
 
 from enums.language import Language
@@ -26,13 +26,23 @@ logger = setup_logger()
 
 async def start_language(message: Message, i18n: I18nContext,
                          dialog_manager: DialogManager, session: AsyncSession):
+    """
+    This function is triggered when the bot starts. It sets the user's language based on their Telegram settings,
+    sends a greeting message, and starts the language change dialog.
+
+    Args:
+        message (Message): The message object from the user.
+        i18n (I18nContext): The internationalization context.
+        dialog_manager (DialogManager): The dialog manager.
+        session (AsyncSession): The database session.
+    """
+
     tg_id = message.from_user.id
     data = {
         "tg_id": tg_id,
         "user_name": f"{message.from_user.first_name} {message.from_user.last_name}",
     }
     await db_add_user(session, data)
-
 
     if message.from_user.language_code in Language.__members__.values():
         language = message.from_user.language_code
@@ -49,6 +59,15 @@ async def start_language(message: Message, i18n: I18nContext,
 
 
 async def language_clicked(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    This function is triggered when a user clicks on a language button. It sets the bot's language to the selected one,
+    updates the bot's commands to the selected language, and starts the language changed dialog.
+
+    Args:
+        callback (CallbackQuery): The callback query from the user's click.
+        button (Button): The button that was clicked.
+        dialog_manager (DialogManager): The dialog manager.
+    """
     language = button.widget_id
     i18n: I18nContext = dialog_manager.middleware_data.get("i18n")
 
@@ -66,7 +85,14 @@ async def language_clicked(callback: CallbackQuery, button: Button, dialog_manag
 
 
 async def on_start_workflow(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    This function is triggered when a user clicks on the 'get started' button. It starts the main menu dialog.
 
+    Args:
+      callback (CallbackQuery): The callback query from the user's click.
+      button (Button): The button that was clicked.
+      dialog_manager (DialogManager): The dialog manager.
+    """
     await dialog_manager.start(MainMenu.show_list,
                                data={"tg_id": callback.from_user.id,
                                      },

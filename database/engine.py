@@ -9,10 +9,16 @@ async_session = async_sessionmaker(bind=engine, expire_on_commit=False, class_=A
 
 
 async def create_db():
+    """
+    Asynchronously create a database.
+    """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
 async def drop_db():
+    """
+    Asynchronously drop a database.
+    """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

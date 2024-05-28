@@ -42,6 +42,17 @@ tmdb.API_KEY = settings.TMDB_API_KEY.get_secret_value()
 
 async def get_movies_list(event_isolation, dialog_manager: DialogManager,
                           session: AsyncSession, i18n: I18nContext, *args, **kwargs):
+    """
+    Asynchronously fetches the list of movies for the user.
+
+    :param event_isolation: Isolation level for the event.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param session: Database session.
+    :param i18n: I18nContext instance for localization.
+    :param args: Additional arguments.
+    :param kwargs: Additional keyword arguments.
+    :return: Dictionary containing information about the movies.
+    """
     dialog_manager.dialog_data.setdefault("page_size", settings.PAGE_SIZE)
     dialog_manager.dialog_data.setdefault("current_page", 1)
     dialog_manager.dialog_data.setdefault("sorting_type", SortingType.MOVIE_RATE)
@@ -74,6 +85,12 @@ async def get_movies_list(event_isolation, dialog_manager: DialogManager,
 
 
 async def sort_movies(movies, dialog_manager: DialogManager):
+    """
+    Asynchronously sorts a list of movies based on the sorting type and order specified in the dialog manager's data.
+
+    :param movies: List of dictionaries where each dictionary represents a movie.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    """
     sorting_type = dialog_manager.dialog_data.get("sorting_type")
     sorting_order = dialog_manager.dialog_data.get("sorting_order")
     sort_key = lambda movie: movie['vote_average']
@@ -105,6 +122,14 @@ async def fetch_movie_details(db_movies, language, dialog_manager: DialogManager
 
 
 async def make_list(movies_info: typing.List[dict], dialog_manager: DialogManager, i18n: I18nContext):
+    """
+    Asynchronously creates a list of movies to display in the dialog.
+
+    :param movies_info: List of dictionaries where each dictionary represents a movie.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param i18n: I18nContext instance for localization.
+    :return: List of movies to be displayed.
+    """
     page_size = dialog_manager.dialog_data["page_size"]
     current_page = dialog_manager.dialog_data["current_page"]
 
@@ -117,14 +142,20 @@ async def make_list(movies_info: typing.List[dict], dialog_manager: DialogManage
     for i in range(start, min(end, movies_num)):
         movie = movies_info[i]
 
-        movie_str = f"{i + 1}. {movie['title']} {movie['vote_average']}"
+        movie_str = f"{movie['title']} {movie['release_date'][0:4]}, {int(movie['vote_average'])} ⭐️"
         movie_list.append((movie_str, movie['id']))
-
 
     return movie_list
 
 
 async def on_arrow_left(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    Handles the event when the left arrow button is clicked.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    """
     data = dialog_manager.dialog_data
     current_page, pages_num = data.get("current_page"), data.get("pages_num")
 
@@ -132,6 +163,13 @@ async def on_arrow_left(callback: CallbackQuery, button: Button, dialog_manager:
 
 
 async def on_arrow_right(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    Handles the event when the right arrow button is clicked.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    """
     data = dialog_manager.dialog_data
     current_page, pages_num = data.get("current_page"), data.get("pages_num")
 
@@ -139,6 +177,13 @@ async def on_arrow_right(callback: CallbackQuery, button: Button, dialog_manager
 
 
 async def on_sorting_type(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    Handles the event when the sorting type button is clicked.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    """
     sorting_type = dialog_manager.dialog_data.get("sorting_type")
 
     dialog_manager.dialog_data["sorting_type"] = SortingType.LIKED_TIME if sorting_type == SortingType.MOVIE_RATE \
@@ -146,6 +191,14 @@ async def on_sorting_type(callback: CallbackQuery, button: Button, dialog_manage
 
 
 async def on_sorting_order(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    Handles the event when the sorting order button is clicked.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    """
+
     sorting_order = dialog_manager.dialog_data.get("sorting_order")
 
     dialog_manager.dialog_data["sorting_order"] = SortingOrder.ASCENDING if sorting_order == SortingOrder.DESCENDING \
@@ -153,6 +206,16 @@ async def on_sorting_order(callback: CallbackQuery, button: Button, dialog_manag
 
 
 async def get_language_list(event_isolation, dialog_manager: DialogManager, i18n: I18nContext, *args, **kwargs):
+    """
+    Fetches the list of available languages.
+
+    :param event_isolation: Isolation level for the event.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param i18n: I18nContext instance for localization.
+    :param args: Additional arguments.
+    :param kwargs: Additional keyword arguments.
+    :return: Dictionary containing information about the languages.
+    """
     languages = []
     for language in Language.__members__.values():
         languages.append((i18n.get(language), language))
@@ -164,6 +227,14 @@ async def get_language_list(event_isolation, dialog_manager: DialogManager, i18n
 
 async def on_language_selected(callback: CallbackQuery, widget: Any,
                                dialog_manager: DialogManager, item_id: str):
+    """
+    Handles the event when a language is selected.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param widget: Widget instance representing the clicked widget.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param item_id: ID of the selected item.
+    """
     language = item_id
     i18n: I18nContext = dialog_manager.middleware_data.get("i18n")
 
@@ -178,11 +249,25 @@ async def on_language_selected(callback: CallbackQuery, widget: Any,
 
 
 async def change_language(message: Message, dialog_manager: DialogManager):
+    """
+    Starts the language change dialog.
+
+    :param message: Message instance representing the received message.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    """
     await dialog_manager.start(MainMenu.change_language, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT)
     await message.delete()
 
 
 async def add_movie(message: Message, dialog_manager: DialogManager, i18n: I18nContext, state: FSMContext):
+    """
+    Starts the add movie dialog.
+
+    :param message: Message instance representing the received message.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param i18n: I18nContext instance for localization.
+    :param state: FSMContext instance representing the current state.
+    """
     await dialog_manager.start(MainMenu.add_movie, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT,
                                data={"tg_id": message.from_user.id,
                                      "message": message.text})
@@ -192,7 +277,17 @@ async def add_movie(message: Message, dialog_manager: DialogManager, i18n: I18nC
 
 async def get_add_movies_list(event_isolation, dialog_manager: DialogManager, i18n: I18nContext,
                               session: AsyncSession, *args, **kwargs):
-    dialog_manager.middleware_data["session"] = session
+    """
+    Asynchronously fetches a list of movies to add based on the user's input.
+
+    :param event_isolation: Isolation level for the event.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param i18n: I18nContext instance for localization.
+    :param session: Database session.
+    :param args: Additional arguments.
+    :param kwargs: Additional keyword arguments.
+    :return: Dictionary containing information about the movies.
+    """
     dialog_manager.dialog_data["tg_id"] = dialog_manager.start_data["tg_id"]
     message = dialog_manager.start_data["message"]
 
@@ -229,6 +324,13 @@ async def get_add_movies_list(event_isolation, dialog_manager: DialogManager, i1
 
 
 async def on_back(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    Handles the event when the back button is clicked.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    """
     await dialog_manager.start(MainMenu.show_list,
                                mode=StartMode.RESET_STACK,
                                show_mode=ShowMode.EDIT,
@@ -236,6 +338,13 @@ async def on_back(callback: CallbackQuery, button: Button, dialog_manager: Dialo
 
 
 async def on_back_to_movie(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    Handles the event when the back button is clicked in the movie details view.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    """
     await dialog_manager.start(MainMenu.show_details,
                                mode=StartMode.RESET_STACK,
                                show_mode=ShowMode.EDIT,
@@ -246,6 +355,15 @@ async def on_back_to_movie(callback: CallbackQuery, button: Button, dialog_manag
 
 
 async def on_movie_to_add(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
+    """
+    Handles the event when a movie is selected to be added from the search results.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param widget: widget instance representing the clicked widget.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param item_id: str representing id on the selected item.
+    :return:
+    """
     await dialog_manager.start(MainMenu.show_details,
                                mode=StartMode.RESET_STACK,
                                show_mode=ShowMode.EDIT,
@@ -255,6 +373,15 @@ async def on_movie_to_add(callback: CallbackQuery, widget: Any, dialog_manager: 
 
 
 async def on_movie_details(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
+    """
+    Handles the event when a movie is selected to show details.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param widget: widget instance representing the clicked widget.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param item_id: str representing id on the selected item.
+    :return:
+    """
     await dialog_manager.start(MainMenu.show_details,
                                mode=StartMode.RESET_STACK,
                                show_mode=ShowMode.EDIT,
@@ -264,6 +391,14 @@ async def on_movie_details(callback: CallbackQuery, widget: Any, dialog_manager:
 
 
 async def on_delete(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    Handles the event when the delete button is clicked in the movie details view.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :return:
+    """
     tg_id = callback.from_user.id
     session = dialog_manager.middleware_data.get("session")
     movie_id = dialog_manager.start_data["movie_id"]
@@ -277,6 +412,14 @@ async def on_delete(callback: CallbackQuery, button: Button, dialog_manager: Dia
 
 
 async def on_state_changed(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    Handles the event when the state button is clicked in the movie details view.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :return:
+    """
     tg_id = callback.from_user.id
     session = dialog_manager.middleware_data.get("session")
     movie_id = dialog_manager.start_data["movie_id"]
@@ -299,6 +442,17 @@ async def on_state_changed(callback: CallbackQuery, button: Button, dialog_manag
 
 async def get_movie_details(event_isolation, dialog_manager: DialogManager, session: AsyncSession, i18n: I18nContext,
                             *args, **kwargs):
+    """
+    Asynchronously fetches the details of a movie.
+
+    :param event_isolation: Isolation level for the event.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param session: Database session.
+    :param i18n: I18nContext instance for localization.
+    :param args:
+    :param kwargs:
+    :return: Dictionary containing information about the movie.
+    """
     movie_id = dialog_manager.start_data["movie_id"]
     tg_id = dialog_manager.middleware_data.get("event_from_user").id
     movie = tmdb.Movies(id=movie_id).info(language=i18n.locale)
@@ -357,6 +511,14 @@ async def get_movie_details(event_isolation, dialog_manager: DialogManager, sess
 
 
 async def get_rating_keyboard(event_isolation, *args, **kwargs):
+    """
+    Asynchronously fetches the rating keyboard.
+
+    :param event_isolation: Isolation level for the event.
+    :param args:
+    :param kwargs:
+    :return:
+    """
     buttons = []
     for i in range(1, 11):
         buttons.append((str(i), i))
@@ -366,6 +528,14 @@ async def get_rating_keyboard(event_isolation, *args, **kwargs):
 
 
 async def on_add_review(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    Handles the event when the add review button is clicked in the movie details view.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :return:
+    """
     await dialog_manager.start(MainMenu.leave_rating,
                                show_mode=ShowMode.EDIT,
                                data={"movie_id": dialog_manager.start_data["movie_id"]}
@@ -373,6 +543,15 @@ async def on_add_review(callback: CallbackQuery, button: Button, dialog_manager:
 
 
 async def on_chosen_rating(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
+    """
+    Handles the event when a rating is chosen.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param widget: Widget instance representing the clicked widget.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param item_id: str representing id on the selected item.
+    :return:
+    """
     data = {"rating": item_id,
             "movie_id": dialog_manager.start_data["movie_id"],
             }
@@ -385,6 +564,14 @@ async def on_chosen_rating(callback: CallbackQuery, widget: Any, dialog_manager:
 
 
 async def get_users_review(message: Message,  message_input: MessageInput, dialog_manager: DialogManager):
+    """
+    Asynchronously fetches the user's review.
+
+    :param message: Message instance representing the received message.
+    :param message_input: MessageInput instance representing the received message input.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :return:
+    """
     rating = dialog_manager.dialog_data["rating"]
     movie_id = dialog_manager.dialog_data["movie_id"]
     session = dialog_manager.middleware_data.get("session")
@@ -409,6 +596,14 @@ async def get_users_review(message: Message,  message_input: MessageInput, dialo
 
 
 async def movie_name_input(message: Message, message_input: MessageInput, dialog_manager: DialogManager):
+    """
+    Asynchronously handles the movie name input.
+
+    :param message: Message instance representing the received message.
+    :param message_input: MessageInput instance representing the received message input.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :return:
+    """
     await dialog_manager.start(MainMenu.add_movie, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT,
                                data={"tg_id": message.from_user.id,
                                      "message": message.text})
@@ -417,6 +612,13 @@ async def movie_name_input(message: Message, message_input: MessageInput, dialog
 
 
 async def show_random_movie(message: Message, dialog_manager: DialogManager):
+    """
+    Asynchronously shows a random movie from the user's list.
+
+    :param message: Message instance representing the received message.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :return:
+    """
     await message.delete()
 
     session = dialog_manager.middleware_data.get("session")
@@ -444,11 +646,27 @@ async def show_random_movie(message: Message, dialog_manager: DialogManager):
 
 
 async def genres_command(message: Message, dialog_manager: DialogManager):
+    """
+    Starts the genre selection dialog.
+
+    :param message: Message instance representing the received message.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :return:
+    """
     await message.delete()
     await dialog_manager.start(MainMenu.choose_genre, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT)
 
 
 async def on_genre_selected(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
+    """
+    Handles the event when a genre is selected.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param widget: Widget instance representing the clicked widget.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param item_id: str representing id on the selected item.
+    :return:
+    """
     selected_genres = dialog_manager.dialog_data.get("selected_genres", [])
     i18n = dialog_manager.middleware_data.get("i18n")
 
@@ -469,6 +687,16 @@ async def on_genre_selected(callback: CallbackQuery, widget: Any, dialog_manager
 
 
 async def get_genres_list(event_isolation, dialog_manager: DialogManager, i18n: I18nContext, *args, **kwargs):
+    """
+    Asynchronously fetches the list of genres.
+
+    :param event_isolation: Isolation level for the event.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param i18n: I18nContext instance for localization.
+    :param args:
+    :param kwargs:
+    :return:
+    """
     tmdb_genres = tmdb.Genres().movie_list(language=i18n.locale)['genres']
     genres = []
     selected_genres = dialog_manager.dialog_data.get("selected_genres", [])
@@ -490,10 +718,28 @@ async def get_genres_list(event_isolation, dialog_manager: DialogManager, i18n: 
 
 
 async def on_find_movies(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    Handles the event when the find movies button is clicked.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :return:
+    """
     await dialog_manager.next()
 
 
 async def get_found_movies(event_isolation, dialog_manager: DialogManager, i18n: I18nContext, *args, **kwargs):
+    """
+    Asynchronously fetches the list of movies based on the selected genres.
+
+    :param event_isolation: Isolation level for the event.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :param i18n: I18nContext instance for localization.
+    :param args:
+    :param kwargs:
+    :return:
+    """
     dialog_manager.dialog_data.setdefault("page_size", settings.PAGE_SIZE)
     dialog_manager.dialog_data.setdefault("current_page", 1)
 
@@ -532,6 +778,13 @@ async def get_found_movies(event_isolation, dialog_manager: DialogManager, i18n:
 
 
 async def on_found_movie(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager, item_id: str):
+    """
+    Handles the event when a movie is selected to be added from the found movies list.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    """
     await dialog_manager.start(MainMenu.show_details,
                                mode=StartMode.RESET_STACK,
                                show_mode=ShowMode.EDIT,
@@ -541,10 +794,25 @@ async def on_found_movie(callback: CallbackQuery, widget: Any, dialog_manager: D
 
 
 async def on_back_to_genres(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    Handles the event when the back button is clicked in the genre selection view.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    """
     await dialog_manager.start(MainMenu.choose_genre, mode=StartMode.RESET_STACK, show_mode=ShowMode.EDIT)
 
 
 async def on_found_movie_to_add(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    """
+    Handles the event when the add movie button is clicked in the movie details view.
+
+    :param callback: CallbackQuery instance representing the callback query.
+    :param button: Button instance representing the clicked button.
+    :param dialog_manager: DialogManager instance to manage the dialog.
+    :return:
+    """
     tg_id = callback.from_user.id
     session = dialog_manager.middleware_data.get("session")
     tmdb_id = int(dialog_manager.start_data["movie_id"])
