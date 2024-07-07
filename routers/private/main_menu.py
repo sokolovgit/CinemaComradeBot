@@ -1,7 +1,6 @@
 import random
 import typing
 from asyncio import sleep
-from math import floor
 from typing import Any
 from datetime import datetime
 
@@ -13,7 +12,7 @@ from aiogram_dialog.widgets.input import MessageInput
 from commands import set_bot_commands
 from settings import settings
 
-from aiogram import F, Router
+from aiogram import F
 from aiogram.types import CallbackQuery, Message, ContentType
 from aiogram_dialog import DialogManager, Dialog, Window, StartMode, ShowMode
 from aiogram_dialog.widgets.text import Format, Multi
@@ -300,7 +299,7 @@ async def get_add_movies_list(event_isolation, dialog_manager: DialogManager, i1
     movies = []
 
     for movie in response['results']:
-        if movie['vote_average'] > 0:
+        if movie.get('vote_average', 0) > 0:
             movie_str = f"{movie['title']} {movie['release_date'][0:4]}, {int(movie['vote_average'])} ⭐️"
             movies.append((movie_str, movie['id']))
 
@@ -781,8 +780,9 @@ async def on_found_movie(callback: CallbackQuery, widget: Any, dialog_manager: D
     """
     Handles the event when a movie is selected to be added from the found movies list.
 
+    :param item_id:
     :param callback: CallbackQuery instance representing the callback query.
-    :param button: Button instance representing the clicked button.
+    :param widget: Button instance representing the clicked button.
     :param dialog_manager: DialogManager instance to manage the dialog.
     """
     await dialog_manager.start(MainMenu.show_details,

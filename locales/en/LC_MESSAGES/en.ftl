@@ -31,17 +31,17 @@ arrow-left =
 arrow-right =
     →
 sorting-rate =
-    Sort by: rating ☆
+    Sort by: rating ⭐️
 sorting-date =
-    Sort by: date added ⏲
+    Sort by: date 🗓️
 order-asc =
-    ↕ Order: ascending
+    Order: ascending 📈
 order-desc =
-    ↕ Order: descending
+    Order: descending 📉
 last-added =
-    ↕ Order: last added
+    Order: last added 🕰️
 first-added =
-    ↕ Order: first added
+    Order: first added 🕰️
 choose-movie-to-add =
     Choose the movie you want to add to the list:
 go-back =

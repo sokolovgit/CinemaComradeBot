@@ -18,7 +18,7 @@ from aiogram_dialog import setup_dialogs
 from enums import Language
 from routers import router
 from middlewares.db import DataBaseSession
-from database.engine import create_db, async_session, drop_db
+from database.engine import create_db, async_session
 
 from settings import settings
 
@@ -38,7 +38,6 @@ async def main():
     This function sets up the bot, the dispatcher, the dialogues, the internationalization middleware, and the database session middleware.
     It also includes the router and starts polling for updates from Telegram.
     """
-    #await drop_db()
     await create_db()
 
     key_builder = DefaultKeyBuilder(with_destiny=True)
